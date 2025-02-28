@@ -2,7 +2,7 @@ import h5py
 import neurokit2 as nk
 from networks.model import BlendMLP, get_BlendMLP, get_MultibranchBeats
 from pywt import wavedec
-from challenge import *
+from helper_code import *
 from utilities.data_preprocessing import batch_preprocessing
 from utilities.results_handling import ResultHandler
 from .pan_tompkins_detector import *
@@ -22,7 +22,6 @@ import time
 import shutil
 from pybaselines import Baseline
 
-
 logger = logging.getLogger(__name__)
 
 thrash_data_dir="../data/irrelevant"
@@ -30,10 +29,6 @@ thrash_data_dir="../data/irrelevant"
 leads_idxs = {'I': 0, 'II': 1, 'III':2, 'aVR': 3, 'aVL':4, 'aVF':5, 'V1':6, 'V2':7, 'V3':8, 'V4':9, 'V5':10, 'V6':11}
 leads_idxs_dict = {
         12: {'I': 0, 'II': 1, 'III':2, 'aVR': 3, 'aVL':4, 'aVF':5, 'V1':6, 'V2':7, 'V3':8, 'V4':9, 'V5':10, 'V6':11},
-        6: {'I': 0, 'II': 1, 'III':2, 'aVR': 3, 'aVL':4, 'aVF':5},
-        4: {'I': 0, 'II': 1, 'III':2, 'aVF':3},
-        3: {'I': 0, 'II': 1, 'aVF':2},
-        2: {'I': 0, 'II':1}
         } #we should use aVF instead of II in 2 leads example
 
 
@@ -51,15 +46,8 @@ def save_headers_recordings_to_json(filename, headers, recordings, idxs):
 
 
 class UtilityFunctions:
-    all_classes = ['6374002', '10370003', '17338001', '39732003', '47665007', '59118001', '59931005',
-                                '111975006', '164889003', '164890007', '164909002', '164917005', '164934002',
-                                '164947007', '251146004', '270492004', '284470004', '365413008', '426177001', '426627000',
-                                '426783006', '427084000', '427393009', '445118002', '698252002', '713426002']
-            #, '427172004','63593006',      '713427006'   , '733534002']
-    classes_counts = dict(zip(['6374002', '10370003', '17338001', '39732003', '47665007', '59118001', '59931005',
-                                '111975006', '164889003', '164890007', '164909002', '164917005', '164934002',
-                                '164947007', '251146004', '270492004', '284470004', '365413008', '426177001', '426627000',
-                                '426783006', '427084000', '427393009', '445118002', '698252002', '713426002'], [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]))
+    all_classes = ['True', 'False']
+    classes_counts = dict(zip(all_classes, [0,0]))
     device=None
     twelve_leads = ('I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6')
     six_leads = ('I', 'II', 'III', 'aVR', 'aVL', 'aVF')
@@ -78,10 +66,10 @@ class UtilityFunctions:
         self.rr_features_size = rr_features_size
         self.wavelet_features_size = wavelet_features_size
 
-        self.training_filename = datasets_dir + 'cinc_database_training_{0}_{1}.h5'
+        self.training_filename = datasets_dir + 'cinc_database_training.h5'
         self.validation_filename = datasets_dir + 'cinc_database_validation_{0}_{1}.h5'
         self.training_full_filename = datasets_dir + 'cinc_database_training_full_{0}_{1}.h5'
-        self.test_filename = datasets_dir + 'cinc_database_test_{0}_{1}.h5'
+        self.test_filename = datasets_dir + 'cinc_database_test.h5'
         self.training_weights_filename = datasets_dir + "weights_fold{0}_training.csv"
         self.training_with_validation_weights_filename = datasets_dir + "weights_full_fold{0}_training.csv"
 
@@ -122,103 +110,51 @@ class UtilityFunctions:
         logger.debug(f"Asigned indexes per class {class_index}")
         return (class_index, classes_counts)
 
+
     def add_classes_counts(self, new_counts):
         logger.debug(f"Adding the following classes count: {new_counts}")
         for k, v in new_counts.items():
             self.classes_counts[k] += v
 
-    def prepare_h5_dataset(self, leads, fold, single_fold_data_training, single_fold_data_test, header_files, recording_files, classes_index, remove_baseline=False):
-        logger.info(f"Preparing H5 dataset for {leads} leads, fold: {fold}")
-        training_data_length = len(single_fold_data_training)
-        lengths = [int(training_data_length * 0.8), training_data_length - int(training_data_length * 0.8)]
-        data_training, data_validation = torch_data.random_split(single_fold_data_training, lengths)
-        num_classes = len(self.all_classes)
-        weights = None
-        training_filename = self.training_filename.format(leads, fold)
-        validation_filename = self.validation_filename.format(leads, fold)
-        training_full_filename = self.training_full_filename.format(leads,fold)
-        test_filename = self.test_filename.format(leads,fold)
-        training_weights_filename = self.training_weights_filename.format(fold)
-        training_with_validation_weights_filename = self.training_with_validation_weights_filename.format(fold)
+
+    def prepare_h5_dataset(self, leads, single_fold_data_training, single_fold_data_test, header_files, recording_files):
+        print(f"Preparing HDF5 dataset from WFDB files")
+        print(f"Training data: {single_fold_data_training}")
+        print(f"Test data:{single_fold_data_test}")
+        training_recording_files = [x[0] for x in single_fold_data_training]
+        training_header_files = [x[1] for x in single_fold_data_training]
+        test_recording_files = [x[0] for x in single_fold_data_test]
+        test_header_files = [x[1] for x in single_fold_data_test]
+        print(f"Training recording files: {training_recording_files}")
+        print(f"Training header files: {training_header_files}")
+        print(f"Test recording files: {test_recording_files}")
+        print(f"Test header files: {test_header_files}")
 
 
+        training_data_length = len(training_recording_files)
+        test_data_length = len(test_recording_files)
 
-        if not os.path.isfile(training_filename):  # _{len(leads)}_training.h5'):
-            logger.info(f"{training_filename} not found, creating database")
-            local_training_counts, all_signals_count = self.create_hdf5_db(data_training, num_classes, header_files, recording_files, self.all_classes, leads,
-                               classes_numbers=self.classes_counts, isTraining=1, selected_classes=self.all_classes, filename=training_filename, remove_baseline=remove_baseline)
-            sorted_classes_numbers = dict(sorted(self.classes_counts.items(), key=lambda x: int(x[0])))
-
-            weights, neg_weights = self.calculate_pos_weights(sorted_classes_numbers, all_signals_count)
-            np.savetxt(training_weights_filename, np.asarray(np.vstack([weights, neg_weights])), delimiter=',')
-            save_headers_recordings_to_json(f"{training_filename}_header_recording_files.json", header_files, recording_files, data_training) 
+        training_filename = self.training_filename
+        test_filename = self.test_filename
 
 
-        if not os.path.isfile(validation_filename):  # {len(leads)}_validation.h5'):
-            logger.info(f"{validation_filename} not found, creating database")
-            local_validation_counts, _ = self.create_hdf5_db(data_validation, num_classes, header_files, recording_files, self.all_classes, leads,
-                               classes_numbers=self.classes_counts, isTraining=0, selected_classes=self.all_classes, filename=validation_filename, remove_baseline=remove_baseline)
-            self.add_classes_counts(local_validation_counts)
-            save_headers_recordings_to_json(f"{validation_filename}_header_recording_files.json", header_files, recording_files, data_validation) 
-
-        if not os.path.isfile(test_filename):  # {len(leads)}_validation.h5'):
-            logger.info(f"{test_filename} not found, creating database")
-            local_test_counts, _ = self.create_hdf5_db(single_fold_data_test, num_classes, header_files, recording_files, self.all_classes, leads,
-                               classes_numbers=self.classes_counts, isTraining=0, selected_classes=self.all_classes, filename=test_filename, remove_baseline=remove_baseline)
-            
-            self.add_classes_counts(local_test_counts)
-            save_headers_recordings_to_json(f"{test_filename}_header_recording_files.json", header_files, recording_files, single_fold_data_test) 
-
-        #if weights is None and os.path.isfile(training_filename):
-        #    logger.info(f"Weights vector is not defined and training dataset ({training_filename}) exists, loading weights")
-        #    weights_total = torch.tensor(np.loadtxt(training_weights_filename, delimiter=','), device=self.device)
-        #    weights = weights_total[0]
-        #    neg_weights = weights_total[1]
-        #    self.weights = weights
-        #    self.neg_weights = neg_weights
-        #    logger.info(f"Loaded positive weights: {weights}")
-        #    logger.info(f"Loaded negative weights: {neg_weights}")
-
-        #classes_occurences_filename = f"classes_in_h5_occurrences_new_{leads}_{fold}.json"
-        #if (sum(self.classes_counts.values()) == 0 or None in self.classes_counts.values()) and os.path.isfile(classes_occurences_filename):
-        #    logger.info(f"Classes counts = 0, loading counts from {classes_occurences_filename} file")
-        #    with open(classes_occurences_filename, 'r') as f:
-        #        self.classes_counts = json.load(f)
-        #elif (len(self.classes_counts.values()) != 0 and all(self.classes_counts.values())) and not os.path.isfile(classes_occurences_filename):
-        #    logger.info(f"Classes counts > 0, saving counts to {classes_occurences_filename} file")
-        #    with open(classes_occurences_filename, 'w') as f:
-        #        json.dump(self.classes_counts, f)
-
-        #logger.info(f"Classes counts: {self.classes_counts}")
-
-        #classes_to_classify = dict().fromkeys(self.all_classes)
-        #index_mapping_from_normal_to_selected = dict()
-        #tmp_iterator = 0
-        #for c in self.classes:
-        #    if c in self.all_classes:
-        #        classes_to_classify[c] = tmp_iterator
-        #        index_mapping_from_normal_to_selected[classes_index[c]] = tmp_iterator
-        #        tmp_iterator += 1
-
-        #sorted_classes_counts = dict(
-        #    sorted([(k, self.classes_counts[k]) for k in classes_to_classify.keys()], key=lambda x: int(x[0])))
-
-        #logger.info(f"Sorted classes counts: {sorted_classes_counts}")
-
-        #weights = self.calculate_pos_weights(sorted_classes_counts.values())
-        #pos_weights = [all_signals_counts / pos_count for pos_count in  class_counts]
-        #logger.info(f"Weights vecotr={weights}")
+        if not os.path.isfile(training_filename):
+            print(f"{training_filename} not found, creating database")
+            local_training_counts, all_signals_count = self.create_hdf5_db(training_data_length, training_header_files, training_recording_files,  leads, isTraining=1, filename=training_filename)
 
 
+        if not os.path.isfile(test_filename):
+            print(f"{test_filename} not found, creating database")
+            local_test_counts, _ = self.create_hdf5_db(test_data_length,  test_header_files, test_recording_files, leads, isTraining=0, filename=test_filename)
 
 
 
 
     def equalize_signal_frequency(self, freq, recording_full):
-        new_recording_full = [] 
+        new_recording_full = []
         if freq == float(257):
             xp = [i * 1.9455 for i in range(recording_full.shape[1])]
-            x = np.linspace(0, 30 * 60 * 500, 30 * 60 * 500)
+            x = np.linspace(0, 30 * 60 * 400, 30 * 60 * 400)
             for lead in recording_full:
                 new_lead = np.interp(x, xp, lead)
                 new_recording_full.append(new_lead)
@@ -228,7 +164,7 @@ class UtilityFunctions:
             x_base = list(range(len(recording_full[0])))
             x_shortened = x_base[::2]
             new_recording_full = recording_full[:, ::2]
-        
+
         return new_recording_full
 
 
@@ -283,7 +219,6 @@ class UtilityFunctions:
                 logger.debug(f"X_baseline_removed shape: {x_baseline_removed.shape}")
                 logger.debug(f"coeffs shape: {coeffs.shape}")
 
-            #return x_raw, x_drift_removed, x_baseline_removed, rr_features, coeffs
             except Exception as e:
                 logger.warn(f"Currently processed file: {header_file}, issue:{e}", exc_info=True)
                 raise
@@ -323,7 +258,7 @@ class UtilityFunctions:
 
 
 
-    def preprocess_recording(self, recording, header, leads_idxs, bw_wavelet="sym10", bw_level=8, denoise_wavelet="db6", deniose_level=3, peaks_method="pantompkins1985", sampling_rate=500):
+    def preprocess_recording(self, recording, header, leads_idxs, bw_wavelet="sym10", bw_level=8, denoise_wavelet="db6", deniose_level=3, peaks_method="pantompkins1985", sampling_rate=400):
         drift_removed_recording, _ = remove_baseline_drift(recording)
         bw_removed_recording, _ = baseline_wandering_removal(recording, bw_wavelet,bw_level)
         signals = {}
@@ -331,7 +266,7 @@ class UtilityFunctions:
         rpeaks_avg = []
         rates = {}
         was_logged=False
-        for lead_name, idx in leads_idxs.items(): 
+        for lead_name, idx in leads_idxs.items():
             coeffs = wavedec(data=drift_removed_recording[idx], wavelet=denoise_wavelet, level=deniose_level)
             drift_removed_recording[idx] = wavelet_threshold(drift_removed_recording[idx], coeffs, denoise_wavelet)
             rpeaks, signal, info = None, None, None
@@ -367,93 +302,83 @@ class UtilityFunctions:
 
     def load_and_equalize_recording(self, recording_file, header, header_file, sampling_rate, leads):
         try:
-            recording = np.array(load_recording(recording_file), dtype=np.float32)
-            recording_full = get_leads_values(header, recording, leads)
-            freq = get_frequency(header)
+            signal, fields = load_signals(recording_file)
+            signal = np.transpose(signal)
+            print(fields)
+            recording = np.array(signal, dtype=np.float32)
+            freq = fields["fs"]
             logger.debug(f"Frequency: {freq}")
             if freq != float(sampling_rate):
-                recording_full = self.equalize_signal_frequency(freq, recording_full) 
+                recording_full = self.equalize_signal_frequency(freq, recording) 
         except Exception as e:
             logger.warn(f"Moving {header_file} and associated recording to {thrash_data_dir} because of {e}", exc_info=True)
             shutil.move(header_file, thrash_data_dir)
             shutil.move(recording_file, thrash_data_dir)
-            recording_full = None
+            recording = None
 
-        return recording_full
-
-
+        return recording
 
 
 
-    def create_hdf5_db(self, num_recordings, num_classes, header_files, recording_files, classes, leads, classes_numbers, isTraining=0, selected_classes=[], filename=None, remove_baseline=False, sampling_rate=500, denoise_signal=True):
+
+
+    def create_hdf5_db(self, num_recordings, header_files, recording_files, leads, isTraining = 1, filename=None, sampling_rate=400):
         group = None
         if isTraining == 1:
             group = 'training'
-        elif isTraining == 0:
-            group = 'validation'
-        else:
-            group = 'validation2'
+        else :
+            group = 'test'
 
         if not filename:
             filename = f'cinc_database_{group}.h5'
 
-
         os.makedirs(os.path.dirname(filename), exist_ok=True)
+        pos_signals = 0
+        all_signals_entries = 0
 
         with h5py.File(filename, 'w') as h5file:
             grp = h5file.create_group(group)
-            dset = grp.create_dataset("data", (1, len(leads), self.window_size),
-                                      maxshape=(None, len(leads), self.window_size), dtype='f',
-                                      chunks=(1, len(leads), self.window_size))
-            lset = grp.create_dataset("label", (1, num_classes), maxshape=(None, num_classes), dtype='f',
-                                      chunks=(1, num_classes))
-            rrset = grp.create_dataset("rr_features", (1, len(leads), self.rr_features_size), maxshape=(None, len(leads), self.rr_features_size), dtype='f',
-                                       chunks=(1, len(leads), self.rr_features_size))
-            waveset = grp.create_dataset("wavelet_features", (1, len(leads), self.wavelet_features_size), maxshape=(None, len(leads), self.wavelet_features_size),
-                                         dtype='f',
-                                         chunks=(1, len(leads), self.wavelet_features_size))
-
-            nodriftset = grp.create_dataset("drift_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size),
-                                         dtype='f',
-                                         chunks=(1, len(leads), self.window_size))
-            nobwset = grp.create_dataset("bw_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size),
-                                         dtype='f',
-                                         chunks=(1, len(leads), self.window_size))
+            dset = grp.create_dataset("data", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size), dtype='f', chunks=(1, len(leads), self.window_size), compression="gzip")
+            lset = grp.create_dataset("label", (1,1), maxshape=(None, 1), dtype=bool)
+            rrset = grp.create_dataset("rr_features", (1, len(leads), self.rr_features_size), maxshape=(None, len(leads), self.rr_features_size), dtype='f', chunks=True)
+            waveset = grp.create_dataset("wavelet_features", (1, len(leads), self.wavelet_features_size), maxshape=(None, len(leads), self.wavelet_features_size), dtype='f', chunks=True)
+            nodriftset = grp.create_dataset("drift_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size),dtype='f',chunks=True)
+            nobwset = grp.create_dataset("bw_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size), dtype='f',chunks=True)
             counter = 0
             avg_processing_times = []
-            all_signals_entries = 0
-            for i in num_recordings:
-                logger.debug(f"Iterating over {counter} out of {num_recordings} files")
-                if len(avg_processing_times) > 0 and len(avg_processing_times) % 500 == 0:
+            for i in range(num_recordings):
+                print(f"Iterating over {counter +1} out of {num_recordings} files")
+                if len(avg_processing_times) > 0 and len(avg_processing_times) % 1000 == 0:
                     logger.info(f"AVG Processing time of a single file: {np.mean(avg_processing_times)}")
 
                 counter += 1
                 # Load header and recording.
                 header = load_header(header_files[i])
-                current_labels= self.clean_labels(header)
-
-                if isTraining < 2:
-                    s1 = set(current_labels)
-                    s2 = set(selected_classes)
-                    logger.debug(f"set {s1} and s2 {s2}")
-                    if not s1.intersection(s2):
-                        logger.debug("sets do not intersect")
-                        continue
-
+                current_label= get_label(header)
 
                 recording_full = self.load_and_equalize_recording(recording_files[i],header, header_files[i], sampling_rate, leads)
                 if recording_full is None:
+                    print(f"Failed to load any data from {recording_files[i]}, skipping")
                     continue
 
                 if recording_full.max() == 0 and recording_full.min() == 0:
-                    logging.debug("Skipping as recording full seems to be none or empty")
+                    print("Skipping {recording_files[i]} as recording full seems to be none or empty")
                     continue
 
                 start_processing = time.time()
 
                 drift_removed_recording, bw_removed_recording, recording, signals, infos, peaks, rates = self.preprocess_recording(recording_full, header,  leads_idxs=leads_idxs_dict[len(leads)])
+                print(recording)
 
                 if signals is None or infos is None or peaks is None or rates is None:
+                    if signals is None:
+                        print(f"Signals is none")
+                    if infos is None:
+                        print("Infos is none")
+                    if peaks is None:
+                        print("Peaks is None")
+                    if rates is None:
+                        print("Rates is none")
                     continue
 
                 recording_raw, recording_drift_removed, recording_bw_removed, rr_features, wavelet_features = self.one_file_training_data(recording, drift_removed_recording, bw_removed_recording, signals, infos, rates, self.window_size,peaks, header_files[i], leads=leads)
@@ -462,11 +387,6 @@ class UtilityFunctions:
 
 
                 logger.debug(f"RR Features: {rr_features.shape}\n recording_raw shape: {recording_raw.shape}\nwavelet_features: {wavelet_features.shape}")
-                local_label = np.zeros((num_classes,), dtype=bool)
-                for label in current_labels:
-                    if label in classes:
-                        j = classes.index(label)
-                        local_label[j] = True
 
                 new_windows = recording_raw.shape[0]
                 if new_windows == 0:
@@ -474,9 +394,18 @@ class UtilityFunctions:
                     continue
                 all_signals_entries += new_windows
 
+                label_pack = None
+
+                if current_label:
+                    label_pack = np.ones((new_windows, 1), dtype=np.bool_)
+                    pos_signals += new_windows
+                else:
+                    label_pack = np.zeros((new_windows, 1), dtype=np.bool_)
+
+                print(f"Label pack shape: {label_pack.shape}")
+
                 dset.resize(dset.shape[0] + new_windows, axis=0)
                 dset[-new_windows:] = recording_raw
-                label_pack = [local_label for i in range(recording_raw.shape[0])]
                 lset.resize(lset.shape[0] + new_windows, axis=0)
                 lset[-new_windows:] = label_pack
                 rrset.resize(rrset.shape[0] + new_windows, axis=0)
@@ -491,15 +420,11 @@ class UtilityFunctions:
                 nobwset.resize(nobwset.shape[0] + new_windows, axis=0)
                 nobwset[-new_windows:] = recording_bw_removed
 
-                logger.debug(f"Classes in header: {current_labels}")
-                for c in current_labels:
-                    if c in selected_classes:
-                        classes_numbers[c] += new_windows
-
-                logger.debug(f"Classes counts after {counter} file: {classes_numbers}")
+                print(f"Positive class counter after file: {pos_signals}")
+                print(f"Total class counter after file: {all_signals_entries}")
 
         print(f'Successfully created {group} dataset {filename}')
-        return classes_numbers, all_signals_entries
+        return pos_signals, all_signals_entries
 
 
     def run_model(self, model: BlendMLP, header, recording, include_domain):
@@ -508,7 +433,7 @@ class UtilityFunctions:
 
         x_features = get_leads_values(header, recording.astype(float), leads)
         freq = get_frequency(header)
-        if freq != float(500):
+        if freq != float(400):
             x_features = self.equalize_signal_frequency(freq, x_features)
 
         drift_removed_recording, bw_removed_recording, recording, signals, infos, peaks, rates = self.preprocess_recording(x_features, header, leads_idxs=leads_idxs_dict[len(leads)])

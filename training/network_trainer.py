@@ -1,6 +1,5 @@
 from re import A
 
-from challenge.test_model_local import load_weights
 from scipy.stats import alpha
 from networks.model import BlendMLP
 from utilities import batch_preprocessing, challenge_metric_loss, sparsity_loss
@@ -44,8 +43,6 @@ class NetworkTrainer:
         self.training_config = training_config
         self.tensorboardWriter = tensorboardWriter
         self.domain_weights_file = domain_weights_file
-        _, self.domain_weights = load_weights(domain_weights_file)
-        self.domain_weights = torch.from_numpy(self.domain_weights)
         logger.debug(f"Initiated NetworkTrainer object\n {self}")
 
 

@@ -14,8 +14,20 @@ import numpy as np
 import os
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 import sys
-
+from config import ARGS
 from helper_code import *
+from datetime import datetime
+import logging
+from utilities import *
+from sklearn.model_selection import train_test_split
+from networks.model import BranchConfig
+from torch.utils import data as torch_data
+from training import *
+
+
+
+logger = logging.getLogger(__name__)
+
 
 ################################################################################
 #
@@ -28,9 +40,64 @@ from helper_code import *
 
 # Train your model.
 def train_model(data_folder, model_folder, verbose):
+    args = ARGS()
+    data_directory= data_folder
+    datasets_target_dir = args.target
+    gpu_number = args.gpu
+    models_dir = model_folder
+    clean_datasets_var=args.clean
+    window_size = args.window_size
+    wavelet_features_size=args.wavelet_features_size
+    alpha_input_size=args.alpha_input_size
+    beta_input_size=args.beta_input_size
+    gamma_input_size=args.gamma_input_size
+    delta_input_size=args.delta_input_size
+    epsilon_input_size=args.epsilon_input_size
+    zeta_input_size=args.zeta_input_size
+    name = args.name
+    debug_mode = verbose
+    remove_baseline = args.remove_baseline
+    fold_to_process = args.fold
+    selected_leads_flag = args.leads
+    network_name = args.network
+    include_domain = args.include_domain
+    alpha_hidden=args.alpha_hidden
+    alpha_layers=args.alpha_layers
+    beta_hidden=args.beta_hidden
+    beta_layers=args.beta_layers
+    epochs=args.epochs
+    leads=('I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6')
+    early_stop=args.early_stop
+    device = torch.device(f"cuda:{gpu_number}" if torch.cuda.is_available() else "cpu")
+    alpha_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, window_size, wavelet_features_size, beta_input_size=alpha_input_size)
+    beta_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, beta_input_size=beta_input_size)
+    gamma_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, beta_input_size=gamma_input_size, channels=1)
+    delta_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, beta_input_size=delta_input_size)
+    epsilon_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, window_size, wavelet_features_size, beta_input_size=epsilon_input_size)
+    zeta_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, window_size, wavelet_features_size, beta_input_size=zeta_input_size)
+
+    leads_idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    execution_time=datetime.now()
+    date = execution_time.date()
+    time = execution_time.time()
+    log_filename =f'logs/{name}/{date}/{time}.log'
+    os.makedirs(os.path.dirname(log_filename), exist_ok=True)
+    logging_level = logging.INFO
+    if debug_mode:
+        logging_level = logging.DEBUG
+
+    logging.basicConfig(filename=log_filename,
+                      level=logging_level,
+                      format='[%(asctime)s %(levelname)-8s %(filename)s:%(lineno)s]  %(message)s',
+                      datefmt='%Y-%m-%d %H:%M:%S')
+    logger.info(f"!!! Experiment: {name} !!!")
+
+    utilityFunctions = UtilityFunctions(device, datasets_dir=datasets_target_dir, rr_features_size=delta_input_size, window_size=window_size, wavelet_features_size=wavelet_features_size)
+
     # Find the data files.
     if verbose:
         print('Finding the Challenge data...')
+        logger.debug("Finding Challenge data")
 
     records = find_records(data_folder)
     num_records = len(records)
@@ -38,12 +105,11 @@ def train_model(data_folder, model_folder, verbose):
     if num_records == 0:
         raise FileNotFoundError('No data were provided.')
 
-    # Extract the features and labels from the data.
-    if verbose:
-        print('Extracting features and labels from the data...')
-
-    features = np.zeros((num_records, 6), dtype=np.float64)
+    headers = []
     labels = np.zeros(num_records, dtype=bool)
+
+    record_files = []
+    header_files = []
 
     # Iterate over the records.
     for i in range(num_records):
@@ -52,23 +118,40 @@ def train_model(data_folder, model_folder, verbose):
             print(f'- {i+1:>{width}}/{num_records}: {records[i]}...')
 
         record = os.path.join(data_folder, records[i])
-        features[i] = extract_features(record)
-        labels[i] = load_label(record)
+        header_files.append(os.path.join(data_folder, get_header_file(records[i])))
+        record_files.append(record)
 
-    # Train the models.
-    if verbose:
-        print('Training the model on the data...')
+        header = load_header(record)
+        headers.append(header)
+        labels[i] = get_label(header)
 
-    # This very simple model trains a random forest model with very simple features.
+    totalX = list(zip(record_files, header_files))
 
-    # Define the parameters for the random forest classifier and regressor.
-    n_estimators = 12  # Number of trees in the forest.
-    max_leaf_nodes = 34  # Maximum number of leaf nodes in each tree.
-    random_state = 56  # Random state; set for reproducibility.
+    train_X, test_X, train_Y, test_Y = train_test_split(totalX, labels, test_size=0.25, random_state=42)
 
-    # Fit the model.
-    model = RandomForestClassifier(
-        n_estimators=n_estimators, max_leaf_nodes=max_leaf_nodes, random_state=random_state).fit(features, labels)
+    utilityFunctions.prepare_h5_dataset(leads,  train_X, test_X, header_files, record_files)
+    training_dataset = HDF5Dataset('./' + utilityFunctions.training_filename, recursive=False, load_data=False, data_cache_size=4, transform=None, leads=leads_idx)
+    logger.info("Loaded training dataset")
+    test_dataset = HDF5Dataset('./' + utilityFunctions.test_filename, recursive=False, load_data=False, data_cache_size=4, transform=None, leads=leads_idx)
+    logger.info("Loaded validation dataset")
+
+    model = get_MultibranchBeats(alpha_config, beta_config, gamma_config, delta_config, epsilon_config, zeta_config, utilityFunctions.all_classes,device, leads=list(leads))
+    training_config = TrainingConfig(batch_size=1500,
+                                    n_epochs_stop=early_stop,
+                                    num_epochs=epochs,
+                                    lr_rate=0.01,
+                                    criterion=nn.BCEWithLogitsLoss(),
+                                    optimizer=torch.optim.Adam(model.parameters(), lr=0.01),
+                                    device=device
+                                    )
+
+    training_data_loader = torch_data.DataLoader(training_dataset, batch_size=1500, shuffle=True, num_workers=6)
+    validation_data_loader = torch_data.DataLoader(validation_dataset, batch_size=1500, shuffle=True, num_workers=6)
+    networkTrainer=NetworkTrainer(utilityFunctions.all_classes, training_config, tensorboardWriter, "weights_eval.csv")
+    trained_model_name= networkTrainer.train(model, alpha_config, beta_config, training_data_loader,  validation_data_loader, fold, leads_dict[selected_leads_flag], include_domain)
+
+
+
 
     # Create a folder for the model if it does not already exist.
     os.makedirs(model_folder, exist_ok=True)
