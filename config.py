@@ -16,7 +16,7 @@ class ARGS():
         self.delta_input_size=256
         self.epsilon_input_size=1500
         self.zeta_input_size=1500
-        self.name = f"Physionet_RUN_{datetime.today().strftime('%Y-%m-%d %H:%M:%S')}"
+        self.name = f"Physionet_RUN_{datetime.today().strftime('%Y-%m-%d')}"
         self.debug_mode = False
         self.remove_baseline = False
         self.fold_to_process = ""
@@ -26,7 +26,7 @@ class ARGS():
         self.alpha_layers=2
         self.beta_hidden=7
         self.beta_layers=2
-        self.epochs=25
+        self.epochs=2
         self.early_stop=6
         self.fold = 1
         self.leads = "12"

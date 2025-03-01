@@ -8,7 +8,6 @@ from utilities.results_handling import ResultHandler
 from .pan_tompkins_detector import *
 from torch.utils import data as torch_data
 from torch.nn.functional import sigmoid
-from .config import *
 from .results_handling import *
 from .data_preprocessing import *
 import numpy as np
@@ -46,7 +45,7 @@ def save_headers_recordings_to_json(filename, headers, recordings, idxs):
 
 
 class UtilityFunctions:
-    all_classes = ['True', 'False']
+    all_classes = ['True']
     classes_counts = dict(zip(all_classes, [0,0]))
     device=None
     twelve_leads = ('I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6')
@@ -234,29 +233,6 @@ class UtilityFunctions:
         return np.hstack((a4, d4, d3, d2, d1))
 
 
-    @staticmethod
-    def clean_labels(header):
-        classes_from_header = get_labels(header)
-        
-        logger.debug(f"Classes found in header: {classes_from_header}")
-        if '733534002' in classes_from_header:
-            classes_from_header[classes_from_header.index('733534002')] = '164909002'
-            classes_from_header = list(set(classes_from_header))
-        if '713427006' in classes_from_header:
-            classes_from_header[classes_from_header.index('713427006')] = '59118001'
-            classes_from_header = list(set(classes_from_header))
-        if '63593006' in classes_from_header:
-            classes_from_header[classes_from_header.index('63593006')] = '284470004'
-            classes_from_header = list(set(classes_from_header))
-        if '427172004' in classes_from_header:
-            classes_from_header[classes_from_header.index('427172004')] = '17338001'
-            classes_from_header = list(set(classes_from_header))
-
-        logger.debug(f"Returning following classes:: {classes_from_header}")
-        return classes_from_header
-
-
-
 
     def preprocess_recording(self, recording, header, leads_idxs, bw_wavelet="sym10", bw_level=8, denoise_wavelet="db6", deniose_level=3, peaks_method="pantompkins1985", sampling_rate=400):
         drift_removed_recording, _ = remove_baseline_drift(recording)
@@ -309,7 +285,7 @@ class UtilityFunctions:
             freq = fields["fs"]
             logger.debug(f"Frequency: {freq}")
             if freq != float(sampling_rate):
-                recording_full = self.equalize_signal_frequency(freq, recording) 
+                recording = self.equalize_signal_frequency(freq, recording) 
         except Exception as e:
             logger.warn(f"Moving {header_file} and associated recording to {thrash_data_dir} because of {e}", exc_info=True)
             shutil.move(header_file, thrash_data_dir)
@@ -339,7 +315,7 @@ class UtilityFunctions:
         with h5py.File(filename, 'w') as h5file:
             grp = h5file.create_group(group)
             dset = grp.create_dataset("data", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size), dtype='f', chunks=(1, len(leads), self.window_size), compression="gzip")
-            lset = grp.create_dataset("label", (1,1), maxshape=(None, 1), dtype=bool)
+            lset = grp.create_dataset("label", (1,1), maxshape=(None, 1), dtype='f')
             rrset = grp.create_dataset("rr_features", (1, len(leads), self.rr_features_size), maxshape=(None, len(leads), self.rr_features_size), dtype='f', chunks=True)
             waveset = grp.create_dataset("wavelet_features", (1, len(leads), self.wavelet_features_size), maxshape=(None, len(leads), self.wavelet_features_size), dtype='f', chunks=True)
             nodriftset = grp.create_dataset("drift_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size),dtype='f',chunks=True)
@@ -470,7 +446,7 @@ class UtilityFunctions:
             return classes, labels, probabilities_mean, 0
         else:
             #alpha1_input, alpha2_input, beta_input, rr, _= batch_preprocessing(batch, include_domain)
-            alpha_input, beta_input, gamma_input, delta_input, epsilon_input, zeta_input, _= batch_preprocessing(batch, include_domain)
+            alpha_input, beta_input, gamma_input, delta_input, epsilon_input, zeta_input, _= batch_preprocessing(batch)
 
             with torch.no_grad():
                 start = time.time()

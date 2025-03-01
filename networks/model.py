@@ -6,7 +6,6 @@ from torch.nn import functional as F
 from torch import autograd
 from torch import jit
 import logging
-import math
 
 
 logger = logging.getLogger(__name__)
@@ -318,9 +317,6 @@ class LSTM_ECG(nn.Module):
             self.linea_multiplier = input_size
             if input_size > 6:
                 self.linea_multiplier = 6
-            # self.hidden_size=1
-            # self.num_layers=1
-            #self.input_size = 1
             self.lstm_alpha1 = nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size,
                                        num_layers=self.num_layers, batch_first=True, bidirectional=False)
             #self.fc = nn.Linear((input_size + input_features_size_b + 1) * self.linea_multiplier * self.hidden_size, num_classes)

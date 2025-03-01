@@ -6,7 +6,7 @@ import torch
 logger = logging.getLogger(__name__)
 
 
-def batch_preprocessing(batch, include_domain):
+def batch_preprocessing(batch):
     return multibranch_division(batch)
 
 def domain_on_all_or_none(batch, include_domain):
