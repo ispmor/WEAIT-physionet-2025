@@ -180,11 +180,11 @@ def run_model(record, model, verbose):
 
     recording_raw, recording_drift_removed, recording_bw_removed, rr_features, wavelet_features= utilityFunctions.one_file_training_data(recording, drift_removed_recording, bw_removed_recording, signals, infos, rates, utilityFunctions.window_size, peaks, header, leads)
 
-    recording_raw = torch.Tensor(recording_raw, device=device)
-    recording_drift_removed = torch.Tensor(recording_drift_removed, device=device)
-    recording_bw_removed = torch.Tensor(recording_bw_removed, device=device)
-    rr_features = torch.Tensor(rr_features, device=device)
-    wavelet_features = torch.Tensor(wavelet_features, device=device)
+    recording_raw = torch.Tensor(recording_raw).to(device)
+    recording_drift_removed = torch.Tensor(recording_drift_removed).to(device)
+    recording_bw_removed = torch.Tensor(recording_bw_removed).to(device)
+    rr_features = torch.Tensor(rr_features).to(device)
+    wavelet_features = torch.Tensor(wavelet_features).to(device)
 
     batch = (recording_raw, recording_drift_removed, recording_bw_removed, None, rr_features, wavelet_features)
     alpha_input, beta_input, gamma_input, delta_input, epsilon_input, zeta_input, _= batch_preprocessing(batch)
