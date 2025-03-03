@@ -5,7 +5,7 @@ class ARGS():
         self.input = "/home/data/"
         self.output =  "/home/results/"
         self.target =  "data/h5_datasets/mikro"
-        self.gpu = 2
+        self.gpu = 0
         self.model = "/home/models/"
         self.clean = False
         self.window_size=1500
@@ -20,7 +20,7 @@ class ARGS():
         self.debug_mode = False
         self.remove_baseline = False
         self.fold_to_process = ""
-        self.network = "LSTM"
+        self.network = "NBEATS"
         self.include_domain = False
         self.alpha_hidden=7
         self.alpha_layers=2
