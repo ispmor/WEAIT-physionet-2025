@@ -159,7 +159,7 @@ def load_model(model_folder, verbose):
     model = get_MultibranchBeats(alpha_config, beta_config, gamma_config, delta_config, epsilon_config, zeta_config, ['True'],device, leads=leads)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.leads = checkpoint['leads']
-    model.to(device)
+    model = model.to(device)
     return model
 
 # Run your trained model. This function is *required*. You should edit this function to add your code, but do *not* change the
@@ -180,11 +180,11 @@ def run_model(record, model, verbose):
 
     recording_raw, recording_drift_removed, recording_bw_removed, rr_features, wavelet_features= utilityFunctions.one_file_training_data(recording, drift_removed_recording, bw_removed_recording, signals, infos, rates, utilityFunctions.window_size, peaks, header, leads)
 
-    recording_raw = torch.Tensor(recording_raw)
-    recording_drift_removed = torch.Tensor(recording_drift_removed)
-    recording_bw_removed = torch.Tensor(recording_bw_removed)
-    rr_features = torch.Tensor(rr_features)
-    wavelet_features = torch.Tensor(wavelet_features)
+    recording_raw = torch.Tensor(recording_raw, device=device)
+    recording_drift_removed = torch.Tensor(recording_drift_removed, device=device)
+    recording_bw_removed = torch.Tensor(recording_bw_removed, device=device)
+    rr_features = torch.Tensor(rr_features, device=device)
+    wavelet_features = torch.Tensor(wavelet_features, device=device)
 
     batch = (recording_raw, recording_drift_removed, recording_bw_removed, None, rr_features, wavelet_features)
     alpha_input, beta_input, gamma_input, delta_input, epsilon_input, zeta_input, _= batch_preprocessing(batch)

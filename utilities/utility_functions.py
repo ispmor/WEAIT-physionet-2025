@@ -19,7 +19,7 @@ from .domain_knowledge_processing import analyse_recording, analysis_dict_to_arr
 from .raw_signal_preprocessing import baseline_wandering_removal, wavelet_threshold, remove_baseline_drift
 import time
 import shutil
-from pybaselines import Baseline
+from scipy.signal import resample
 
 logger = logging.getLogger(__name__)
 
@@ -151,18 +151,14 @@ class UtilityFunctions:
 
     def equalize_signal_frequency(self, freq, recording_full):
         new_recording_full = []
-        if freq == float(257):
-            xp = [i * 1.9455 for i in range(recording_full.shape[1])]
-            x = np.linspace(0, 30 * 60 * 400, 30 * 60 * 400)
+        if freq != 400:
+            current_length = len(recording_full[0])
+            scaler = float(400 / freq)
+            target_samples = current_length * scaler
             for lead in recording_full:
-                new_lead = np.interp(x, xp, lead)
+                new_lead = resample(recording_full[lead], target_samples)
                 new_recording_full.append(new_lead)
             new_recording_full = np.array(new_recording_full)
-
-        if freq == float(1000):
-            x_base = list(range(len(recording_full[0])))
-            x_shortened = x_base[::2]
-            new_recording_full = recording_full[:, ::2]
 
         return new_recording_full
 
