@@ -26,7 +26,7 @@ class ARGS():
         self.alpha_layers=2
         self.beta_hidden=7
         self.beta_layers=2
-        self.epochs=2
+        self.epochs=15
         self.early_stop=6
         self.fold = 1
         self.leads = "12"
