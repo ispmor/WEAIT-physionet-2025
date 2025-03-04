@@ -120,7 +120,11 @@ def train_model(data_folder, model_folder, verbose):
 
         header = load_header(record)
         headers.append(header)
-        labels[i] = get_label(header)
+        try:
+            labels[i] = get_label(header)
+        except Exception as e:
+            print("Label not found, asigning 0")
+            labels[i] = 0
 
     totalX = list(zip(record_files, header_files))
 
