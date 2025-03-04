@@ -231,6 +231,8 @@ class UtilityFunctions:
 
 
     def preprocess_recording(self, recording, header, leads_idxs, bw_wavelet="sym10", bw_level=8, denoise_wavelet="db6", deniose_level=3, peaks_method="pantompkins1985", sampling_rate=400):
+        if recording is None:
+            return (None, None, None, None, None, None, None)
         drift_removed_recording, _ = remove_baseline_drift(recording)
         bw_removed_recording, _ = baseline_wandering_removal(recording, bw_wavelet,bw_level)
         signals = {}
