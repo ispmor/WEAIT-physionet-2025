@@ -1,3 +1,4 @@
+import math
 import h5py
 import neurokit2 as nk
 from networks.model import BlendMLP, get_BlendMLP, get_MultibranchBeats
@@ -154,7 +155,7 @@ class UtilityFunctions:
         if freq != 400:
             current_length = len(recording_full[0])
             scaler = float(400 / freq)
-            target_samples = current_length * scaler
+            target_samples = int(math.ceil(current_length * scaler))
             for lead in recording_full:
                 new_lead = resample(lead, target_samples)
                 new_recording_full.append(new_lead)
