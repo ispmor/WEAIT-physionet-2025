@@ -326,7 +326,11 @@ class UtilityFunctions:
                 counter += 1
                 # Load header and recording.
                 header = load_header(header_files[i])
-                current_label= get_label(header)
+                try:
+                    current_label= get_label(header)
+                except Exception as e:
+                    print("Failed to load label, assigning 0")
+                    current_label = 0
 
                 recording_full = self.load_and_equalize_recording(recording_files[i],header, header_files[i], sampling_rate, leads)
                 if recording_full is None:
