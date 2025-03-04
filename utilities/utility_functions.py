@@ -283,9 +283,9 @@ class UtilityFunctions:
             if freq != float(sampling_rate):
                 recording = self.equalize_signal_frequency(freq, recording) 
         except Exception as e:
-            logger.warn(f"Moving {header_file} and associated recording to {thrash_data_dir} because of {e}", exc_info=True)
-            shutil.move(header_file, thrash_data_dir)
-            shutil.move(recording_file, thrash_data_dir)
+            logger.warn(f"Skipping {header_file} and associated recording  because of {e}", exc_info=True)
+            #shutil.move(header_file, thrash_data_dir)
+            #shutil.move(recording_file + ".dat", thrash_data_dir)
             recording = None
 
         return recording
