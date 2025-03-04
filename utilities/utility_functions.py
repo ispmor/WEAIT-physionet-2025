@@ -156,7 +156,7 @@ class UtilityFunctions:
             scaler = float(400 / freq)
             target_samples = current_length * scaler
             for lead in recording_full:
-                new_lead = resample(recording_full[lead], target_samples)
+                new_lead = resample(lead, target_samples)
                 new_recording_full.append(new_lead)
             new_recording_full = np.array(new_recording_full)
 
