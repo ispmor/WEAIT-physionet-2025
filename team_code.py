@@ -179,6 +179,10 @@ def run_model(record, model, verbose):
 
 
     recording_raw, recording_drift_removed, recording_bw_removed, rr_features, wavelet_features= utilityFunctions.one_file_training_data(recording, drift_removed_recording, bw_removed_recording, signals, infos, rates, utilityFunctions.window_size, peaks, header, leads)
+    if len(recording_raw[0]) < 2000:
+        probability_output = 0.0
+        binary_output = 0.0
+        return binary_output, probability_output
 
     recording_raw = torch.Tensor(recording_raw).to(device)
     recording_drift_removed = torch.Tensor(recording_drift_removed).to(device)
