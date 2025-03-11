@@ -60,7 +60,7 @@ class UtilityFunctions:
 
 
 
-    def __init__(self, device, datasets_dir="h5_datasets/", window_size=350, rr_features_size=16, wavelet_features_size=185) -> None:
+    def __init__(self, device, datasets_dir="h5_datasets/", window_size=1500, rr_features_size=16, wavelet_features_size=185) -> None:
         self.device = device
         self.window_size = window_size
         self.rr_features_size = rr_features_size
@@ -70,8 +70,7 @@ class UtilityFunctions:
         self.validation_filename = datasets_dir + 'cinc_database_validation_{0}_{1}.h5'
         self.training_full_filename = datasets_dir + 'cinc_database_training_full_{0}_{1}.h5'
         self.test_filename = datasets_dir + 'cinc_database_test.h5'
-        self.training_weights_filename = datasets_dir + "weights_fold{0}_training.csv"
-        self.training_with_validation_weights_filename = datasets_dir + "weights_full_fold{0}_training.csv"
+        self.training_weights_filename = datasets_dir + "weights.csv" 
 
         logger.debug(f"Initiated UtilityFunctions: {self.__dict__}")
 
@@ -117,18 +116,12 @@ class UtilityFunctions:
             self.classes_counts[k] += v
 
 
-    def prepare_h5_dataset(self, leads, single_fold_data_training, single_fold_data_test, header_files, recording_files):
+    def prepare_h5_dataset(self, leads, single_fold_data_training, single_fold_data_test):
         print(f"Preparing HDF5 dataset from WFDB files")
-        print(f"Training data: {single_fold_data_training}")
-        print(f"Test data:{single_fold_data_test}")
         training_recording_files = [x[0] for x in single_fold_data_training]
         training_header_files = [x[1] for x in single_fold_data_training]
         test_recording_files = [x[0] for x in single_fold_data_test]
         test_header_files = [x[1] for x in single_fold_data_test]
-        print(f"Training recording files: {training_recording_files}")
-        print(f"Training header files: {training_header_files}")
-        print(f"Test recording files: {test_recording_files}")
-        print(f"Test header files: {test_header_files}")
 
 
         training_data_length = len(training_recording_files)
@@ -140,12 +133,15 @@ class UtilityFunctions:
 
         if not os.path.isfile(training_filename):
             print(f"{training_filename} not found, creating database")
-            local_training_counts, all_signals_count = self.create_hdf5_db(training_data_length, training_header_files, training_recording_files,  leads, isTraining=1, filename=training_filename)
+            positive_class_count, all_signals_count = self.create_hdf5_db(training_data_length, training_header_files, training_recording_files,  leads, isTraining=1, filename=training_filename)
+            np.savetxt(self.training_weights_filename, np.asarray(np.vstack([positive_class_count, all_signals_count])), delimiter=',')
+
 
 
         if not os.path.isfile(test_filename):
             print(f"{test_filename} not found, creating database")
             local_test_counts, _ = self.create_hdf5_db(test_data_length,  test_header_files, test_recording_files, leads, isTraining=0, filename=test_filename)
+
 
 
 
@@ -167,9 +163,6 @@ class UtilityFunctions:
 
 
     def one_file_training_data(self, recording, drift_removed_recording, bw_removed_recording, signals, infos, rates, single_peak_length, peaks, header_file, leads):
-        logger.debug("Entering one_file_training_data")
-        logger.debug(f"Recording shape: {drift_removed_recording.shape}")
-
 
         x_raw = []
         x_drift_removed = []
@@ -178,13 +171,13 @@ class UtilityFunctions:
         peaks_considered = []
         horizon = self.window_size // 2
         recording_length=len(drift_removed_recording[0])
-        for peak in range(0, recording_length, 500):
+        for peak in range(0, recording_length, self.window_size):
             if peak + self.window_size < recording_length:
                 signal_local = drift_removed_recording[:, peak: peak + self.window_size]
                 signal_local_raw = recording[:, peak: peak + self.window_size]
                 signal_local_bw = bw_removed_recording[:, peak: peak + self.window_size]
                 wavelet_features = self.get_wavelet_features(signal_local, 'db2')
-                peaks_considered.extend([p for p in peaks if peak <= p < peak+500])
+                peaks_considered.extend([p for p in peaks if peak <= p < peak+self.window_size])
             else:
                 logger.debug(f"Skipping append as peak = {peak}")
                 continue
@@ -202,7 +195,7 @@ class UtilityFunctions:
 
         rr_features = np.zeros((x_drift_removed.shape[0], drift_removed_recording.shape[0], self.rr_features_size), dtype=np.float64)
         counter = 0 
-        for peak in range(0, recording_length-self.window_size, 500):
+        for peak in range(0, recording_length-self.window_size, self.window_size):
 
             try:
                 domain_knowledge_analysis = analyse_recording(drift_removed_recording, signals, infos, rates,leads_idxs_dict[len(leads)], window=(peak, peak+self.window_size), pantompkins_peaks=peaks_considered)
@@ -231,7 +224,7 @@ class UtilityFunctions:
 
 
 
-    def preprocess_recording(self, recording, header, leads_idxs, bw_wavelet="sym10", bw_level=8, denoise_wavelet="db6", deniose_level=3, peaks_method="pantompkins1985", sampling_rate=400):
+    def preprocess_recording(self, recording, header, leads_idxs, bw_wavelet="sym10", bw_level=6, denoise_wavelet="db6", deniose_level=3, peaks_method="pantompkins1985", sampling_rate=400):
         if recording is None:
             return (None, None, None, None, None, None, None)
         drift_removed_recording, _ = remove_baseline_drift(recording)
@@ -278,11 +271,13 @@ class UtilityFunctions:
     def load_and_equalize_recording(self, recording_file, header, header_file, sampling_rate, leads):
         try:
             signal, fields = load_signals(recording_file)
+            if len(signal) > self.window_size * 10:
+                signal = signal[:self.window_size * 10]
+
             signal = np.transpose(signal)
             print(fields)
             recording = np.array(signal, dtype=np.float32)
             freq = fields["fs"]
-            logger.debug(f"Frequency: {freq}")
             if freq != float(sampling_rate):
                 recording = self.equalize_signal_frequency(freq, recording) 
         except Exception as e:
@@ -313,18 +308,15 @@ class UtilityFunctions:
 
         with h5py.File(filename, 'w') as h5file:
             grp = h5file.create_group(group)
-            dset = grp.create_dataset("data", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size), dtype='f', chunks=(1, len(leads), self.window_size), compression="gzip")
-            lset = grp.create_dataset("label", (1,1), maxshape=(None, 1), dtype='f')
+            dset = grp.create_dataset("data", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size), dtype='f', chunks=(1, len(leads), self.window_size))
+            lset = grp.create_dataset("label", (1,1), maxshape=(None, 1), dtype='f', chunks=(1, 1))
             rrset = grp.create_dataset("rr_features", (1, len(leads), self.rr_features_size), maxshape=(None, len(leads), self.rr_features_size), dtype='f', chunks=True)
-            waveset = grp.create_dataset("wavelet_features", (1, len(leads), self.wavelet_features_size), maxshape=(None, len(leads), self.wavelet_features_size), dtype='f', chunks=True)
-            nodriftset = grp.create_dataset("drift_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size),dtype='f',chunks=True)
-            nobwset = grp.create_dataset("bw_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size), dtype='f',chunks=True)
+            waveset = grp.create_dataset("wavelet_features", (1, len(leads), self.wavelet_features_size), maxshape=(None, len(leads), self.wavelet_features_size), dtype='f', chunks=(1, len(leads), self.wavelet_features_size))
+            nodriftset = grp.create_dataset("drift_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size),dtype='f',chunks=(1, len(leads), self.window_size))
+            nobwset = grp.create_dataset("bw_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size), dtype='f',chunks=(1, len(leads), self.window_size))
             counter = 0
-            avg_processing_times = []
             for i in range(num_recordings):
-                print(f"Iterating over {counter +1} out of {num_recordings} files")
-                if len(avg_processing_times) > 0 and len(avg_processing_times) % 1000 == 0:
-                    logger.info(f"AVG Processing time of a single file: {np.mean(avg_processing_times)}")
+                print(f"Iterating over {counter +1} out of {num_recordings} files - {header_files[i]}")
 
                 counter += 1
                 # Load header and recording.
@@ -335,6 +327,7 @@ class UtilityFunctions:
                     print("Failed to load label, assigning 0")
                     current_label = 0
 
+
                 recording_full = self.load_and_equalize_recording(recording_files[i],header, header_files[i], sampling_rate, leads)
                 if recording_full is None:
                     print(f"Failed to load any data from {recording_files[i]}, skipping")
@@ -344,10 +337,8 @@ class UtilityFunctions:
                     print("Skipping {recording_files[i]} as recording full seems to be none or empty")
                     continue
 
-                start_processing = time.time()
 
                 drift_removed_recording, bw_removed_recording, recording, signals, infos, peaks, rates = self.preprocess_recording(recording_full, header,  leads_idxs=leads_idxs_dict[len(leads)])
-                print(recording)
 
                 if signals is None or infos is None or peaks is None or rates is None:
                     if signals is None:
@@ -361,11 +352,7 @@ class UtilityFunctions:
                     continue
 
                 recording_raw, recording_drift_removed, recording_bw_removed, rr_features, wavelet_features = self.one_file_training_data(recording, drift_removed_recording, bw_removed_recording, signals, infos, rates, self.window_size,peaks, header_files[i], leads=leads)
-                end_processing = time.time()
-                avg_processing_times.append(end_processing - start_processing)
 
-
-                logger.debug(f"RR Features: {rr_features.shape}\n recording_raw shape: {recording_raw.shape}\nwavelet_features: {wavelet_features.shape}")
 
                 new_windows = recording_raw.shape[0]
                 if new_windows == 0:
@@ -381,7 +368,6 @@ class UtilityFunctions:
                 else:
                     label_pack = np.zeros((new_windows, 1), dtype=np.bool_)
 
-                print(f"Label pack shape: {label_pack.shape}")
 
                 dset.resize(dset.shape[0] + new_windows, axis=0)
                 dset[-new_windows:] = recording_raw
@@ -466,41 +452,25 @@ class UtilityFunctions:
                 return classes, labels, probabilities_mean, peak_time
 
 
-    def load_training_weights_for_fold(self, fold):
+    def load_training_weights(self):
         data = []
-        logger.debug(f"Loading {self.training_weights_filename.format(fold)}")
-        with open(self.training_weights_filename.format(fold), 'r') as f:
+        with open(self.training_weights_filename, 'r') as f:
             reader = csv.reader(f)
             for i, line in enumerate(reader):
                 data.append(list(line))
             logger.debug(f"Loaded weights from CSV Reader: {data}")
         weights=torch.from_numpy(np.array(data, dtype=np.float32)).to(self.device)
         pos_weights = weights[0]
-        neg_weights = weights[1]
+        total_weights = weights[1]
 
-        logger.debug(f"Loaded list of pos_weights: {pos_weights}, neg_weights: {neg_weights}")
-        return pos_weights, neg_weights
-
+        final_weight = total_weights/pos_weights
+        return final_weight
 
     def load_test_headers_and_recordings(self, fold, leads):
         test_filename = self.test_filename.format(leads,fold)
         with open(f"{test_filename}_header_recording_files.json", 'r') as f:
             loaded_dict = json.load(f)
             return (loaded_dict['header_files'], loaded_dict['recording_files'])
-
-
-
-    def load_training_weights(self, fold):
-        data = []
-        for i in range(fold-1):
-            logger.debug(f"Loading {self.training_with_validation_weights_filename.format(i)}")
-            with open(self.training_with_validation_weights_filename.format(i), 'r') as f:
-                reader = csv.reader(f)
-                data.append(list(reader))
-        average=np.mean(data, axis=0, dtype=float).flatten()
-        result=torch.from_numpy(average).to(self.device)
-        logger.debug(f"Loaded list of weights: {result}")
-        return result
 
 
     #TODO zdefiniować mądrzejsze ogarnianie device

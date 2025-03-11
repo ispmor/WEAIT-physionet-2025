@@ -4,7 +4,7 @@ class ARGS():
     def __init__(self):
         self.input = "/home/data/"
         self.output =  "/home/results/"
-        self.target =  "data/h5_datasets/mikro"
+        self.target =  "data/h5_datasets/"
         self.gpu = 0
         self.model = "/home/models/"
         self.clean = False

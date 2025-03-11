@@ -12,7 +12,6 @@
 import joblib
 import numpy as np
 import os
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 import sys
 from config import ARGS
 from helper_code import *
@@ -80,8 +79,6 @@ def train_model(data_folder, model_folder, verbose):
     tensorboardWriter: SummaryWriter = SummaryWriter(f"runs/physionet-2025")
     os.makedirs(os.path.dirname(log_filename), exist_ok=True)
     logging_level = logging.INFO
-    if debug_mode:
-        logging_level = logging.DEBUG
 
     logging.basicConfig(filename=log_filename,
                       level=logging_level,
@@ -128,27 +125,31 @@ def train_model(data_folder, model_folder, verbose):
 
     totalX = list(zip(record_files, header_files))
 
-    train_X, test_X, train_Y, test_Y = train_test_split(totalX, labels, test_size=0.25, random_state=42)
+    train_X, test_X, _, _ = train_test_split(totalX, labels, test_size=0.25, random_state=42)
 
-    utilityFunctions.prepare_h5_dataset(leads,  train_X, test_X, header_files, record_files)
+    del labels
+
+    utilityFunctions.prepare_h5_dataset(leads,  train_X, test_X)
     training_dataset = HDF5Dataset('./' + utilityFunctions.training_filename, recursive=False, load_data=False, data_cache_size=4, transform=None, leads=leads_idx)
     logger.info("Loaded training dataset")
+    weights = utilityFunctions.load_training_weights()
+
     test_dataset = HDF5Dataset('./' + utilityFunctions.test_filename, recursive=False, load_data=False, data_cache_size=4, transform=None, leads=leads_idx)
     logger.info("Loaded validation dataset")
 
     model = get_MultibranchBeats(alpha_config, beta_config, gamma_config, delta_config, epsilon_config, zeta_config, utilityFunctions.all_classes,device, leads=list(leads))
-    training_config = TrainingConfig(batch_size=1500,
+    training_config = TrainingConfig(batch_size=500,
                                     n_epochs_stop=early_stop,
                                     num_epochs=epochs,
                                     lr_rate=0.01,
-                                    criterion=BCEWithLogitsLoss(),
+                                    criterion=BCEWithLogitsLoss(pos_weight=weights),
                                     optimizer=torch.optim.Adam(model.parameters(), lr=0.01),
                                     device=device,
                                     model_repository=model_folder
                                     )
 
-    training_data_loader = torch_data.DataLoader(training_dataset, batch_size=1500, shuffle=True, num_workers=6)
-    test_data_loader = torch_data.DataLoader(test_dataset, batch_size=1500, shuffle=True, num_workers=6)
+    training_data_loader = torch_data.DataLoader(training_dataset, batch_size=500, shuffle=True, num_workers=6)
+    test_data_loader = torch_data.DataLoader(test_dataset, batch_size=500, shuffle=True, num_workers=6)
     networkTrainer=NetworkTrainer(utilityFunctions.all_classes, training_config, tensorboardWriter)
     trained_model_name= networkTrainer.train(model, alpha_config, beta_config, training_data_loader,  test_data_loader, leads)
 

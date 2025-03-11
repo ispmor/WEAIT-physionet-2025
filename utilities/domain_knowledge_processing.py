@@ -169,7 +169,7 @@ def has_missing_p(info, window):
     return num_of_p < (num_of_beats - 1)
 
 
-def get_QRS_duration(signals, info, window, freq=500, with_nans=True):
+def get_QRS_duration(signals, info, window, freq=400, with_nans=True):
     r_peaks = get_window_only(info['ECG_R_Peaks'], window)
     q_peaks = get_window_only(info['ECG_Q_Peaks'], window)
     s_peaks = get_window_only(info['ECG_S_Peaks'], window)
@@ -197,7 +197,7 @@ def get_QRS_duration(signals, info, window, freq=500, with_nans=True):
 
     return pad_array(result)
 
-def get_S_duration(signals, info, window, freq=500, with_nans=True):
+def get_S_duration(signals, info, window, freq=400, with_nans=True):
     r_peaks = get_window_only(info['ECG_R_Peaks'], window)
     s_peaks = get_window_only(info['ECG_S_Peaks'], window)
     num_peaks = len(r_peaks)
@@ -215,7 +215,7 @@ def get_S_duration(signals, info, window, freq=500, with_nans=True):
     return pad_array(result)
 
 
-def get_R_duration(signals, info, window, freq=500, with_nans=True):
+def get_R_duration(signals, info, window, freq=400, with_nans=True):
     r_peaks = get_window_only(info['ECG_R_Peaks'], window)
     r_ons = get_window_only(info['ECG_R_Onsets'], window)
     r_offs = get_window_only(info['ECG_R_Offsets'], window)
@@ -428,7 +428,7 @@ def pad_array(array, mhb=25):
     return np.pad(array, (0, mhb - len(array)), 'constant', constant_values=(0, 0))
 
 
-def analyse_recording(rec, signals, infos, rates, leads_idxs,window=None, pantompkins_peaks=None, label=None,  sampling_rate=500):
+def analyse_recording(rec, signals, infos, rates, leads_idxs,window=None, pantompkins_peaks=None, label=None,  sampling_rate=400):
     #assuming max bpm = 500 it gives us max 25 heart beats within 3s window
     mhb = 25
     logger.debug("Entering analysed_results")
