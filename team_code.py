@@ -24,7 +24,6 @@ from networks.model import BranchConfig
 from torch.utils import data as torch_data
 from training import *
 from torch.nn import BCEWithLogitsLoss
-from torch.utils.tensorboard import SummaryWriter
 import torch
 
 
@@ -77,7 +76,6 @@ def train_model(data_folder, model_folder, verbose):
     date = execution_time.date()
     time = execution_time.time()
     log_filename =f'logs/{name}/{date}/{time}.log'
-    tensorboardWriter: SummaryWriter = SummaryWriter(f"runs/physionet-2025")
     os.makedirs(os.path.dirname(log_filename), exist_ok=True)
     logging_level = logging.INFO
     if debug_mode:
@@ -137,7 +135,7 @@ def train_model(data_folder, model_folder, verbose):
     logger.info("Loaded validation dataset")
 
     model = get_MultibranchBeats(alpha_config, beta_config, gamma_config, delta_config, epsilon_config, zeta_config, utilityFunctions.all_classes,device, leads=list(leads))
-    training_config = TrainingConfig(batch_size=1500,
+    training_config = TrainingConfig(batch_size=500,
                                     n_epochs_stop=early_stop,
                                     num_epochs=epochs,
                                     lr_rate=0.01,
@@ -147,9 +145,9 @@ def train_model(data_folder, model_folder, verbose):
                                     model_repository=model_folder
                                     )
 
-    training_data_loader = torch_data.DataLoader(training_dataset, batch_size=1500, shuffle=True, num_workers=6)
-    test_data_loader = torch_data.DataLoader(test_dataset, batch_size=1500, shuffle=True, num_workers=6)
-    networkTrainer=NetworkTrainer(utilityFunctions.all_classes, training_config, tensorboardWriter)
+    training_data_loader = torch_data.DataLoader(training_dataset, batch_size=500, shuffle=True, num_workers=3)
+    test_data_loader = torch_data.DataLoader(test_dataset, batch_size=500, shuffle=True, num_workers=3)
+    networkTrainer=NetworkTrainer(utilityFunctions.all_classes, training_config)
     trained_model_name= networkTrainer.train(model, alpha_config, beta_config, training_data_loader,  test_data_loader, leads)
 
     if verbose:

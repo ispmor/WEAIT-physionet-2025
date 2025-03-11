@@ -320,11 +320,8 @@ class UtilityFunctions:
             nodriftset = grp.create_dataset("drift_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size),dtype='f',chunks=True)
             nobwset = grp.create_dataset("bw_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size), dtype='f',chunks=True)
             counter = 0
-            avg_processing_times = []
             for i in range(num_recordings):
                 print(f"Iterating over {counter +1} out of {num_recordings} files")
-                if len(avg_processing_times) > 0 and len(avg_processing_times) % 1000 == 0:
-                    logger.info(f"AVG Processing time of a single file: {np.mean(avg_processing_times)}")
 
                 counter += 1
                 # Load header and recording.
@@ -344,10 +341,8 @@ class UtilityFunctions:
                     print("Skipping {recording_files[i]} as recording full seems to be none or empty")
                     continue
 
-                start_processing = time.time()
 
                 drift_removed_recording, bw_removed_recording, recording, signals, infos, peaks, rates = self.preprocess_recording(recording_full, header,  leads_idxs=leads_idxs_dict[len(leads)])
-                print(recording)
 
                 if signals is None or infos is None or peaks is None or rates is None:
                     if signals is None:
@@ -361,9 +356,6 @@ class UtilityFunctions:
                     continue
 
                 recording_raw, recording_drift_removed, recording_bw_removed, rr_features, wavelet_features = self.one_file_training_data(recording, drift_removed_recording, bw_removed_recording, signals, infos, rates, self.window_size,peaks, header_files[i], leads=leads)
-                end_processing = time.time()
-                avg_processing_times.append(end_processing - start_processing)
-
 
                 logger.debug(f"RR Features: {rr_features.shape}\n recording_raw shape: {recording_raw.shape}\nwavelet_features: {wavelet_features.shape}")
 
@@ -381,8 +373,6 @@ class UtilityFunctions:
                 else:
                     label_pack = np.zeros((new_windows, 1), dtype=np.bool_)
 
-                print(f"Label pack shape: {label_pack.shape}")
-
                 dset.resize(dset.shape[0] + new_windows, axis=0)
                 dset[-new_windows:] = recording_raw
                 lset.resize(lset.shape[0] + new_windows, axis=0)
@@ -398,9 +388,6 @@ class UtilityFunctions:
                 nodriftset[-new_windows:] = recording_drift_removed
                 nobwset.resize(nobwset.shape[0] + new_windows, axis=0)
                 nobwset[-new_windows:] = recording_bw_removed
-
-                print(f"Positive class counter after file: {pos_signals}")
-                print(f"Total class counter after file: {all_signals_entries}")
 
         print(f'Successfully created {group} dataset {filename}')
         return pos_signals, all_signals_entries
@@ -449,16 +436,13 @@ class UtilityFunctions:
             return classes, labels, probabilities_mean, 0
         else:
             #alpha1_input, alpha2_input, beta_input, rr, _= batch_preprocessing(batch, include_domain)
-            alpha_input, beta_input, gamma_input, delta_input, epsilon_input, zeta_input, _= batch_preprocessing(batch)
+            alpha_input, beta_input, _, delta_input, epsilon_input, zeta_input, _= batch_preprocessing(batch)
 
             with torch.no_grad():
-                start = time.time()
                 #scores = model(alpha1_input.to(self.device), alpha2_input.to(self.device), beta_input.to(self.device), rr.to(self.device))
-                scores = model(alpha_input.to(self.device), beta_input.to(self.device), gamma_input.to(self.device), delta_input.to(self.device), epsilon_input.to(self.device), zeta_input.to(self.device))
-                end = time.time()
-                peak_time = (end - start) / len(peaks)
+                scores = model(alpha_input.to(self.device), beta_input.to(self.device), None, delta_input.to(self.device), epsilon_input.to(self.device), zeta_input.to(self.device))
                 #del alpha1_input, alpha2_input, beta_input
-                del alpha_input, beta_input, gamma_input, delta_input, epsilon_input, zeta_input
+                del alpha_input, beta_input, delta_input, epsilon_input, zeta_input
                 probabilities = sigmoid(scores)
                 probabilities_mean = torch.mean(probabilities, 0).detach().cpu().numpy()
                 labels = probabilities_mean > 0.5

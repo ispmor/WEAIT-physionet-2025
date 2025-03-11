@@ -3,7 +3,6 @@ import numpy as np
 import torch
 import logging
 import os
-from torch.utils.tensorboard import SummaryWriter
 
 
 logger = logging.getLogger(__name__)
@@ -35,10 +34,9 @@ class NetworkTrainer:
     min_val_loss = 999
     selected_classe = []
     training_config: TrainingConfig = None
-    def __init__(self, selected_classes: list, training_config: TrainingConfig, tensorboardWriter: SummaryWriter) -> None:
+    def __init__(self, selected_classes: list, training_config: TrainingConfig) -> None:
         self.selected_classe=selected_classes
         self.training_config = training_config
-        self.tensorboardWriter = tensorboardWriter
         logger.debug(f"Initiated NetworkTrainer object\n {self}")
 
 
@@ -50,8 +48,8 @@ class NetworkTrainer:
         for batch in training_data_loader:
             local_step += 1
             model.train()
-            alpha_input, beta_input, gamma_input, delta_input, epsilon_input, zeta_input, y = batch_preprocessing(batch)
-            forecast = model(alpha_input.to(self.training_config.device), beta_input.to(self.training_config.device), gamma_input.to(self.training_config.device), delta_input.to(self.training_config.device), epsilon_input.to(self.training_config.device), zeta_input.to(self.training_config.device))
+            alpha_input, beta_input, _, delta_input, epsilon_input, zeta_input, y = batch_preprocessing(batch)
+            forecast = model(alpha_input.to(self.training_config.device), beta_input.to(self.training_config.device), None, delta_input.to(self.training_config.device), epsilon_input.to(self.training_config.device), zeta_input.to(self.training_config.device))
 
             loss = self.training_config.criterion(forecast, y.to(self.training_config.device))  # torch.zeros(size=(16,)))
             epoch_loss.append(loss)
@@ -76,8 +74,8 @@ class NetworkTrainer:
         with torch.no_grad():
             model.eval()
             for batch in validation_data_loader:
-                alpha_input, beta_input, gamma_input, delta_input, epsilon_input, zeta_input, y = batch_preprocessing(batch)
-                forecast = model(alpha_input.to(self.training_config.device), beta_input.to(self.training_config.device), gamma_input.to(self.training_config.device), delta_input.to(self.training_config.device), epsilon_input.to(self.training_config.device), zeta_input.to(self.training_config.device))
+                alpha_input, beta_input, _, delta_input, epsilon_input, zeta_input, y = batch_preprocessing(batch)
+                forecast = model(alpha_input.to(self.training_config.device), beta_input.to(self.training_config.device), _, delta_input.to(self.training_config.device), epsilon_input.to(self.training_config.device), zeta_input.to(self.training_config.device))
 
                 loss = self.training_config.criterion(forecast, y.to(self.training_config.device))
                 epoch_loss.append(loss)
@@ -92,8 +90,6 @@ class NetworkTrainer:
         for epoch in range(self.training_config.num_epochs):
             epoch_loss = self.train_network(blendModel, training_data_loader, epoch)
             epoch_validation_loss = self.validate_network(blendModel, validation_data_loader, epoch)
-            self.tensorboardWriter.add_scalar("Loss/training", epoch_loss, epoch)
-            self.tensorboardWriter.add_scalar("Loss/validation", epoch_validation_loss, epoch)
             logger.info(f"Training loss for epoch {epoch} = {epoch_loss}")
             logger.info(f"Validation loss for epoch {epoch} = {epoch_validation_loss}")
 
