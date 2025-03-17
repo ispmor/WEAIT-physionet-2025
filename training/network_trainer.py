@@ -85,7 +85,7 @@ class NetworkTrainer:
 
 
     def train(self, blendModel, alpha_config, beta_config, training_data_loader, validation_data_loader, leads):
-        model_name = f"{self.training_config.model_repository}/best_model_physionet2025.th"
+        model_name = os.path.join(self.training_config.model_repository, "best_model_physionet2025.th")
         epochs_no_improve=0
         min_val_loss=999999
 
