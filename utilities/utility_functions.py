@@ -392,7 +392,7 @@ class UtilityFunctions:
                 print(f"Total class counter after file: {all_signals_entries}")
 
         print(f'Successfully created {group} dataset {filename}')
-        return 1, 100#NOW PSEUDO WEIGHTS REFLECTING 1% of data is positive. pos_signals, all_signals_entries
+        return pos_signals, all_signals_entries
 
 
     def run_model(self, model: BlendMLP, header, recording, include_domain):
