@@ -306,91 +306,74 @@ class UtilityFunctions:
         pos_signals = 1
         all_signals_entries = 1
 
-        with h5py.File(filename, 'w') as h5file:
-            grp = h5file.create_group(group)
-            dset = grp.create_dataset("data", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size), dtype='f', chunks=(1, len(leads), self.window_size))
-            lset = grp.create_dataset("label", (1,1), maxshape=(None, 1), dtype='f', chunks=(1, 1))
-            rrset = grp.create_dataset("rr_features", (1, len(leads), self.rr_features_size), maxshape=(None, len(leads), self.rr_features_size), dtype='f', chunks=True)
-            waveset = grp.create_dataset("wavelet_features", (1, len(leads), self.wavelet_features_size), maxshape=(None, len(leads), self.wavelet_features_size), dtype='f', chunks=(1, len(leads), self.wavelet_features_size))
-            nodriftset = grp.create_dataset("drift_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size),dtype='f',chunks=(1, len(leads), self.window_size))
-            nobwset = grp.create_dataset("bw_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size), dtype='f',chunks=(1, len(leads), self.window_size))
-            counter = 0
-            for i in range(num_recordings):
-                print(f"Iterating over {counter +1} out of {num_recordings} files - {header_files[i]}")
-
-                counter += 1
-                # Load header and recording.
-                header = load_header(header_files[i])
-                try:
-                    current_label= get_label(header)
-                except Exception as e:
-                    print("Failed to load label, assigning 0")
-                    current_label = 0
-
-                if (pos_signals / all_signals_entries) < 0.25 and current_label == 0:
-                    continue
-
-
-                recording_full = self.load_and_equalize_recording(recording_files[i],header, header_files[i], sampling_rate, leads)
-                if recording_full is None:
-                    print(f"Failed to load any data from {recording_files[i]}, skipping")
-                    continue
-
-                if recording_full.max() == 0 and recording_full.min() == 0:
-                    print("Skipping {recording_files[i]} as recording full seems to be none or empty")
-                    continue
-
-
-                drift_removed_recording, bw_removed_recording, recording, signals, infos, peaks, rates = self.preprocess_recording(recording_full, header,  leads_idxs=leads_idxs_dict[len(leads)])
-
-                if signals is None or infos is None or peaks is None or rates is None:
-                    if signals is None:
-                        print(f"Signals is none")
-                    if infos is None:
-                        print("Infos is none")
-                    if peaks is None:
-                        print("Peaks is None")
-                    if rates is None:
-                        print("Rates is none")
-                    continue
-
-                recording_raw, recording_drift_removed, recording_bw_removed, rr_features, wavelet_features = self.one_file_training_data(recording, drift_removed_recording, bw_removed_recording, signals, infos, rates, self.window_size,peaks, header_files[i], leads=leads)
-
-
-                new_windows = recording_raw.shape[0]
-                if new_windows == 0:
-                    logger.debug("New windows is 0! SKIPPING")
-                    continue
-                all_signals_entries += new_windows
-
-                label_pack = None
-
-                if current_label:
-                    label_pack = np.ones((new_windows, 1), dtype=np.bool_)
-                    pos_signals += new_windows
-                else:
-                    label_pack = np.zeros((new_windows, 1), dtype=np.bool_)
-
-
-                dset.resize(dset.shape[0] + new_windows, axis=0)
-                dset[-new_windows:] = recording_raw
-                lset.resize(lset.shape[0] + new_windows, axis=0)
-                lset[-new_windows:] = label_pack
-                rrset.resize(rrset.shape[0] + new_windows, axis=0)
-                rrset[-new_windows:] = rr_features
-                waveset.resize(waveset.shape[0] + new_windows, axis=0)
-                if wavelet_features.shape[0] != new_windows:
-                    waveset[-new_windows:] = wavelet_features[:-1]
-                else:
-                    waveset[-new_windows:] = wavelet_features
-                nodriftset.resize(nodriftset.shape[0] + new_windows, axis=0)
-                nodriftset[-new_windows:] = recording_drift_removed
-                nobwset.resize(nobwset.shape[0] + new_windows, axis=0)
-                nobwset[-new_windows:] = recording_bw_removed
-
-                print(f"Positive class counter after file: {pos_signals}")
-                print(f"Total class counter after file: {all_signals_entries}")
-
+        h5file = h5py.File(filename, 'w')
+        grp = h5file.create_group(group)
+        dset = grp.create_dataset("data", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size), dtype='f', chunks=(1, len(leads), self.window_size))
+        lset = grp.create_dataset("label", (1,1), maxshape=(None, 1), dtype='f', chunks=(1, 1))
+        rrset = grp.create_dataset("rr_features", (1, len(leads), self.rr_features_size), maxshape=(None, len(leads), self.rr_features_size), dtype='f', chunks=True)
+        waveset = grp.create_dataset("wavelet_features", (1, len(leads), self.wavelet_features_size), maxshape=(None, len(leads), self.wavelet_features_size), dtype='f', chunks=(1, len(leads), self.wavelet_features_size))
+        nodriftset = grp.create_dataset("drift_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size),dtype='f',chunks=(1, len(leads), self.window_size))
+        nobwset = grp.create_dataset("bw_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size), dtype='f',chunks=(1, len(leads), self.window_size))
+        counter = 0
+        for i in range(num_recordings):
+            print(f"Iterating over {counter +1} out of {num_recordings} files - {header_files[i]}")
+            counter += 1
+            # Load header and recording.
+            header = load_header(header_files[i])
+            try:
+                current_label= get_label(header)
+            except Exception as e:
+                print("Failed to load label, assigning 0")
+                current_label = 0
+            if (pos_signals / all_signals_entries) < 0.25 and current_label == 0:
+                continue
+            recording_full = self.load_and_equalize_recording(recording_files[i],header, header_files[i], sampling_rate, leads)
+            if recording_full is None:
+                print(f"Failed to load any data from {recording_files[i]}, skipping")
+                continue
+            if recording_full.max() == 0 and recording_full.min() == 0:
+                print("Skipping {recording_files[i]} as recording full seems to be none or empty")
+                continue
+            drift_removed_recording, bw_removed_recording, recording, signals, infos, peaks, rates = self.preprocess_recording(recording_full, header,  leads_idxs=leads_idxs_dict[len(leads)])
+            if signals is None or infos is None or peaks is None or rates is None:
+                if signals is None:
+                    print(f"Signals is none")
+                if infos is None:
+                    print("Infos is none")
+                if peaks is None:
+                    print("Peaks is None")
+                if rates is None:
+                    print("Rates is none")
+                continue
+            recording_raw, recording_drift_removed, recording_bw_removed, rr_features, wavelet_features = self.one_file_training_data(recording, drift_removed_recording, bw_removed_recording, signals, infos, rates, self.window_size,peaks, header_files[i], leads=leads)
+            new_windows = recording_raw.shape[0]
+            if new_windows == 0:
+                logger.debug("New windows is 0! SKIPPING")
+                continue
+            all_signals_entries += new_windows
+            label_pack = None
+            if current_label:
+                label_pack = np.ones((new_windows, 1), dtype=np.bool_)
+                pos_signals += new_windows
+            else:
+                label_pack = np.zeros((new_windows, 1), dtype=np.bool_)
+            dset.resize(dset.shape[0] + new_windows, axis=0)
+            dset[-new_windows:] = recording_raw
+            lset.resize(lset.shape[0] + new_windows, axis=0)
+            lset[-new_windows:] = label_pack
+            rrset.resize(rrset.shape[0] + new_windows, axis=0)
+            rrset[-new_windows:] = rr_features
+            waveset.resize(waveset.shape[0] + new_windows, axis=0)
+            if wavelet_features.shape[0] != new_windows:
+                waveset[-new_windows:] = wavelet_features[:-1]
+            else:
+                waveset[-new_windows:] = wavelet_features
+            nodriftset.resize(nodriftset.shape[0] + new_windows, axis=0)
+            nodriftset[-new_windows:] = recording_drift_removed
+            nobwset.resize(nobwset.shape[0] + new_windows, axis=0)
+            nobwset[-new_windows:] = recording_bw_removed
+            print(f"Positive class counter after file: {pos_signals}")
+            print(f"Total class counter after file: {all_signals_entries}")
         print(f'Successfully created {group} dataset {filename}')
         return pos_signals, all_signals_entries
 
