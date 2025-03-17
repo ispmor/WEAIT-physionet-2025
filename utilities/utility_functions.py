@@ -303,8 +303,8 @@ class UtilityFunctions:
             filename = f'cinc_database_{group}.h5'
 
         os.makedirs(os.path.dirname(filename), exist_ok=True)
-        pos_signals = 0
-        all_signals_entries = 0
+        pos_signals = 1
+        all_signals_entries = 1
 
         with h5py.File(filename, 'w') as h5file:
             grp = h5file.create_group(group)
@@ -326,6 +326,9 @@ class UtilityFunctions:
                 except Exception as e:
                     print("Failed to load label, assigning 0")
                     current_label = 0
+
+                if (pos_signals / all_signals_entries) < 0.5 and current_label == 0:
+                    continue
 
 
                 recording_full = self.load_and_equalize_recording(recording_files[i],header, header_files[i], sampling_rate, leads)
@@ -389,7 +392,7 @@ class UtilityFunctions:
                 print(f"Total class counter after file: {all_signals_entries}")
 
         print(f'Successfully created {group} dataset {filename}')
-        return pos_signals, all_signals_entries
+        return 1, 100#NOW PSEUDO WEIGHTS REFLECTING 1% of data is positive. pos_signals, all_signals_entries
 
 
     def run_model(self, model: BlendMLP, header, recording, include_domain):
