@@ -327,7 +327,7 @@ class UtilityFunctions:
                     print("Failed to load label, assigning 0")
                     current_label = 0
 
-                if (pos_signals / all_signals_entries) < 0.5 and current_label == 0:
+                if (pos_signals / all_signals_entries) < 0.25 and current_label == 0:
                     continue
 
 
