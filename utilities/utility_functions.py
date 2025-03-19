@@ -1,25 +1,18 @@
 import math
 import h5py
 import neurokit2 as nk
-from networks.model import BlendMLP, get_BlendMLP, get_MultibranchBeats
+from networks.model import  get_MultibranchBeats
 from pywt import wavedec
-from helper_code import *
-from utilities.data_preprocessing import batch_preprocessing
-from utilities.results_handling import ResultHandler
+from helper_code import get_label, load_header, load_signals
 from .pan_tompkins_detector import *
-from torch.utils import data as torch_data
-from torch.nn.functional import sigmoid
 from .results_handling import *
 from .data_preprocessing import *
 import numpy as np
 import logging
 import torch
 import csv
-import time
 from .domain_knowledge_processing import analyse_recording, analysis_dict_to_array
 from .raw_signal_preprocessing import baseline_wandering_removal, wavelet_threshold, remove_baseline_drift
-import time
-import shutil
 from scipy.signal import resample
 
 logger = logging.getLogger(__name__)
@@ -74,40 +67,6 @@ class UtilityFunctions:
 
         logger.debug(f"Initiated UtilityFunctions: {self.__dict__}")
 
-    #TODO create def initiate_classes_count method which will zero the classes_counts, also we need a global count
-
-    def calculate_pos_weights(self, class_counts, all_signals_count):
-        logger.info(f"Calculating positional weights for class_counts: {class_counts} and all_signals_count: {all_signals_count}")
-        for key, value in class_counts.items():
-            if value == 0:
-                class_counts[key] = 1
-
-        pos_weights = [all_signals_count / pos_count for key, pos_count in  class_counts.items()]
-        neg_weights = [all_signals_count / (all_signals_count - pos_count) for key, pos_count in  class_counts.items()]
-
-        logger.info(f"Result positional weights: {pos_weights}")
-        return pos_weights, neg_weights #torch.as_tensor(pos_weights, dtype=torch.float, device=self.device)
-
-
-    def extract_classes(self, header_files):
-        logger.info("Extracting classes from header files")
-        classes_counts = dict()
-        classes = set()
-        for header_file in header_files:
-            header = load_header(header_file)
-            classes_from_header = get_labels(header)
-            classes |= set(classes_from_header)
-            for c in classes_from_header:
-                if c in classes_counts:
-                    classes_counts[c] += 1
-                else:
-                    classes_counts[c] = 1
-        self.classes = sorted(classes) 
-        class_index = {c:i for i,c in enumerate(classes)} 
-
-        logger.debug(f"Classes found in dataset: {classes}")
-        logger.debug(f"Asigned indexes per class {class_index}")
-        return (class_index, classes_counts)
 
 
     def add_classes_counts(self, new_counts):
@@ -140,7 +99,7 @@ class UtilityFunctions:
 
         if not os.path.isfile(test_filename):
             print(f"{test_filename} not found, creating database")
-            local_test_counts, _ = self.create_hdf5_db(test_data_length,  test_header_files, test_recording_files, leads, isTraining=0, filename=test_filename)
+            _, _ = self.create_hdf5_db(test_data_length,  test_header_files, test_recording_files, leads, isTraining=0, filename=test_filename)
 
 
 
@@ -169,7 +128,6 @@ class UtilityFunctions:
         x_baseline_removed = []
         coeffs = []
         peaks_considered = []
-        horizon = self.window_size // 2
         recording_length=len(drift_removed_recording[0])
         for peak in range(0, recording_length, self.window_size):
             if peak + self.window_size < recording_length:
@@ -202,14 +160,9 @@ class UtilityFunctions:
                 logger.debug(f"{domain_knowledge_analysis}")
                 rr_features[counter] = analysis_dict_to_array(domain_knowledge_analysis, leads_idxs_dict[len(leads)])
                 counter += 1
-                logger.debug(f"RR_features shape after dict to array: {rr_features.shape}")
-                logger.debug(f"X_raw shape: {x_raw.shape}")
-                logger.debug(f"X_drift_removed shape: {x_drift_removed.shape}")
-                logger.debug(f"X_baseline_removed shape: {x_baseline_removed.shape}")
-                logger.debug(f"coeffs shape: {coeffs.shape}")
 
             except Exception as e:
-                logger.warn(f"Currently processed file: {header_file}, issue:{e}", exc_info=True)
+                logger.warning(f"Currently processed file: {header_file}, issue:{e}", exc_info=True)
                 raise
 
 
@@ -243,8 +196,8 @@ class UtilityFunctions:
                 signal, info =nk.ecg_delineate(drift_removed_recording[idx], rpeaks=rpeaks, sampling_rate=sampling_rate, method='dwt')
             except Exception as e:
                 if not was_logged:
-                    logger.warn(e, exc_info=True)
-                    logger.warn(f"Comming from: \n{header}")
+                    logger.warning(e, exc_info=True)
+                    logger.warning(f"Comming from: \n{header}")
                     was_logged=True
 
             signals[lead_name] = signal
@@ -268,9 +221,8 @@ class UtilityFunctions:
             return (drift_removed_recording, bw_removed_recording, recording, signals, infos, None, None)
 
 
-    def load_and_equalize_recording(self, recording_file, header, header_file, sampling_rate, leads):
+    def load_and_equalize_recording(self, signal, fields, header_file, sampling_rate):
         try:
-            signal, fields = load_signals(recording_file)
             if len(signal) > self.window_size * 10:
                 signal = signal[:self.window_size * 10]
 
@@ -281,9 +233,7 @@ class UtilityFunctions:
             if freq != float(sampling_rate):
                 recording = self.equalize_signal_frequency(freq, recording) 
         except Exception as e:
-            logger.warn(f"Skipping {header_file} and associated recording  because of {e}", exc_info=True)
-            #shutil.move(header_file, thrash_data_dir)
-            #shutil.move(recording_file + ".dat", thrash_data_dir)
+            logger.warning(f"Skipping {header_file} and associated recording  because of {e}", exc_info=True)
             recording = None
 
         return recording
@@ -325,13 +275,28 @@ class UtilityFunctions:
             except Exception as e:
                 print("Failed to load label, assigning 0")
                 current_label = 0
-            if (pos_signals / all_signals_entries) < 0.25 and current_label == 0:
+
+            try:
+                signal, fields = load_signals(header_files[i])
+            except Exception as e:
+                print(f"Skipping {header_files[i]} and associated recording  because of {e}")
                 continue
-            recording_full = self.load_and_equalize_recording(recording_files[i],header, header_files[i], sampling_rate, leads)
+
+            weight_multiplier = 1
+            if "comments" in fields:
+                source_info = [x for x in fields["comments"] if "Source" in x]
+                if len(source_info) > 0:
+                    if "CODE" in source_info[0]:
+                        weight_multiplier = 1
+                    if "SaMi-Trop" in source_info[0]:
+                        weight_multiplier = 10
+
+
+            recording_full = self.load_and_equalize_recording(signal, fields, header_files[i], sampling_rate)
             if recording_full is None:
                 print(f"Failed to load any data from {recording_files[i]}, skipping")
                 continue
-            if recording_full.max() == 0 and recording_full.min() == 0:
+            if max(recording_full) == 0 and min(recording_full) == 0:
                 print("Skipping {recording_files[i]} as recording full seems to be none or empty")
                 continue
             drift_removed_recording, bw_removed_recording, recording, signals, infos, peaks, rates = self.preprocess_recording(recording_full, header,  leads_idxs=leads_idxs_dict[len(leads)])
@@ -350,7 +315,7 @@ class UtilityFunctions:
             if new_windows == 0:
                 logger.debug("New windows is 0! SKIPPING")
                 continue
-            all_signals_entries += new_windows
+            all_signals_entries += weight_multiplier*new_windows
             label_pack = None
             if current_label:
                 label_pack = np.ones((new_windows, 1), dtype=np.bool_)
@@ -378,71 +343,11 @@ class UtilityFunctions:
         return pos_signals, all_signals_entries
 
 
-    def run_model(self, model: BlendMLP, header, recording, include_domain):
-        classes = model.classes
-        leads = model.leads
-
-        x_features = get_leads_values(header, recording.astype(float), leads)
-        freq = get_frequency(header)
-        if freq != float(400):
-            x_features = self.equalize_signal_frequency(freq, x_features)
-
-        drift_removed_recording, bw_removed_recording, recording, signals, infos, peaks, rates = self.preprocess_recording(x_features, header, leads_idxs=leads_idxs_dict[len(leads)])
-        if signals is None or infos is None or peaks is None or rates is None:
-            labels = np.zeros(len(classes))
-            probabilities_mean = np.zeros(len(classes))
-            labels=probabilities_mean > 0.5
-            return classes, labels, probabilities_mean, 0
-
-        recording_raw, recording_drift_removed, recording_bw_removed, rr_features, wavelet_features= self.one_file_training_data(recording, drift_removed_recording, bw_removed_recording, signals, infos, rates, self.window_size, peaks, header, leads)
-        logger.debug(f"RR_features shape obtained from one_file_training_data: {rr_features.shape}")
-        logger.debug(f"First dimension of RR_features: {rr_features[0]}")
-        recording_raw = torch.Tensor(recording_raw)
-        logger.debug(f"recording_raw shape from one_file_training_data: {recording_raw.shape}")
-        logger.debug(f"First dimension of recording_raw: {recording_raw[0]}")
-        recording_drift_removed = torch.Tensor(recording_drift_removed)
-        logger.debug(f"recording_drift_removed shape from one_file_training_data: {recording_drift_removed.shape}")
-        logger.debug(f"First dimension of recording_drift_removed: {recording_drift_removed[0]}")
-        recording_bw_removed = torch.Tensor(recording_bw_removed)
-        logger.debug(f"recording_bw_removed shape from one_file_training_data: {recording_bw_removed.shape}")
-        logger.debug(f"First dimension of recording_bw_removed: {recording_bw_removed[0]}")
-        rr_features = torch.Tensor(rr_features)
-        wavelet_features = torch.Tensor(wavelet_features)
-        logger.debug(f"Wavelets_features from one_file_training_data: {wavelet_features.shape}")
-        logger.debug(f"First dimension of wavelets_features: {wavelet_features[0]}")
-
-        #batch = (x_features, None, rr_features, wavelet_features)
-        batch = (recording_raw, recording_drift_removed, recording_bw_removed, None, rr_features, wavelet_features)
-        # Predict labels and probabilities.
-        if len(x_features) == 0:
-            labels = np.zeros(len(classes))
-            probabilities_mean = np.zeros(len(classes))
-            labels=probabilities_mean > 0.5
-            return classes, labels, probabilities_mean, 0
-        else:
-            #alpha1_input, alpha2_input, beta_input, rr, _= batch_preprocessing(batch, include_domain)
-            alpha_input, beta_input, gamma_input, delta_input, epsilon_input, zeta_input, _= batch_preprocessing(batch)
-
-            with torch.no_grad():
-                start = time.time()
-                #scores = model(alpha1_input.to(self.device), alpha2_input.to(self.device), beta_input.to(self.device), rr.to(self.device))
-                scores = model(alpha_input.to(self.device), beta_input.to(self.device), gamma_input.to(self.device), delta_input.to(self.device), epsilon_input.to(self.device), zeta_input.to(self.device))
-                end = time.time()
-                peak_time = (end - start) / len(peaks)
-                #del alpha1_input, alpha2_input, beta_input
-                del alpha_input, beta_input, gamma_input, delta_input, epsilon_input, zeta_input
-                probabilities = sigmoid(scores)
-                probabilities_mean = torch.mean(probabilities, 0).detach().cpu().numpy()
-                labels = probabilities_mean > 0.5
-
-                return classes, labels, probabilities_mean, peak_time
-
-
     def load_training_weights(self):
         data = []
         with open(self.training_weights_filename, 'r') as f:
             reader = csv.reader(f)
-            for i, line in enumerate(reader):
+            for _, line in enumerate(reader):
                 data.append(list(line))
             logger.debug(f"Loaded weights from CSV Reader: {data}")
         weights=torch.from_numpy(np.array(data, dtype=np.float32)).to(self.device)
@@ -469,42 +374,4 @@ class UtilityFunctions:
         model.to(device)
         logger.info(f'Restored checkpoint from {filename}.') 
         return model
-
-
-
-    def test_network(self, model, weights_file, header_files, recording_files, fold, leads, include_domain,  experiment_name="",  num_classes=26  )-> ResultHandler:
-        classes_eval, weights_eval = load_weights(weights_file)
-        scalar_outputs = np.ndarray((len(header_files), num_classes))
-        binary_outputs = [[] for _ in range(len(header_files))]
-        c = np.ndarray((len(header_files), num_classes))
-        times = np.zeros(len(header_files))
-        labels = load_labels(header_files, classes_eval)
-        logger.debug(f"labels: {labels}")
-        logger.debug(f"Labels shape: {labels.shape}")
-        logger.debug(f"Scalar outputs shape: {labels.shape}")
-        total_size = len(header_files)
-        for i,header_filename in enumerate(header_files):
-            logger.info(f"Testing: {i+1}/{total_size}, {header_filename}")
-            header = load_header(header_filename)
-            recording = load_recording(recording_files[i])
-            c[i], binary_outputs[i], scalar_outputs[i], times[i] = self.run_model(model, header, recording, include_domain=include_domain)
-            logger.debug(f"Scalar outputs: {scalar_outputs[i]}\nBinary outputs: {binary_outputs[i]}\nC: {c[i]}")
-        logger.info("########################################################")
-        logger.info(f"#####   Fold={fold}, Leads: {len(leads)}")
-        logger.info("########################################################")
-        binary_outputs_local, scalar_outputs_local = load_classifier_outputs(binary_outputs, scalar_outputs, c, classes_eval)
-        auroc, auprc, auroc_classes, auprc_classes = compute_auc(labels, scalar_outputs)
-        logger.info(f'--- AUROC, AUPRC: {auroc}, {auprc}')
-        logger.info(f'--- AVG peak classification time: {np.mean(times)}')
-        accuracy = compute_accuracy(labels, binary_outputs_local)
-        logger.info(f'--- Accuracy: { accuracy}')
-        f_measure, f_measure_classes = compute_f_measure(labels, binary_outputs_local)
-        logger.info(f'--- F-measure: {f_measure}')
-        challenge_metric = compute_challenge_metric(weights_eval, labels, binary_outputs_local, classes_eval, set(['426783006']))
-        logger.info(f'--- Challenge metric: {challenge_metric}')
-        logger.info("########################################################")
-
-        binary_outputs_list = [x.tolist() for x in binary_outputs]
-        return ResultHandler(c,labels, binary_outputs_list, scalar_outputs, times, auroc, auprc, auroc_classes, auprc_classes, f_measure, f_measure_classes, challenge_metric, leads, fold, experiment_name, accuracy=accuracy)
-
 

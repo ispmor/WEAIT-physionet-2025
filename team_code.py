@@ -23,7 +23,6 @@ from networks.model import BranchConfig
 from torch.utils import data as torch_data
 from training import *
 from torch.nn import BCEWithLogitsLoss
-from torch.utils.tensorboard import SummaryWriter
 import torch
 
 
@@ -57,8 +56,7 @@ delta_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_siz
 epsilon_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, window_size, wavelet_features_size, beta_input_size=epsilon_input_size)
 zeta_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, window_size, wavelet_features_size, beta_input_size=zeta_input_size)
 
-leads_idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-
+leads_idx = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], dtype=np.float64)
 
 ################################################################################
 #
@@ -119,7 +117,7 @@ def train_model(data_folder, model_folder, verbose):
         headers.append(header)
         try:
             labels[i] = get_label(header)
-        except Exception as e:
+        except Exception:
             print("Label not found, asigning 0")
             labels[i] = 0
 
@@ -143,7 +141,7 @@ def train_model(data_folder, model_folder, verbose):
                                     num_epochs=epochs,
                                     lr_rate=0.01,
                                     criterion=BCEWithLogitsLoss(pos_weight=weights),
-                                    optimizer=torch.optim.Adam(model.parameters(), lr=0.01),
+                                    optimizer=torch.optim.adam.Adam(model.parameters(), lr=0.01),
                                     device=device,
                                     model_repository=model_folder
                                     )
@@ -161,7 +159,9 @@ def train_model(data_folder, model_folder, verbose):
 # arguments of this function. If you do not train one of the models, then you can return None for the model.
 def load_model(model_folder, verbose):
     checkpoint = torch.load(os.path.join(model_folder, "best_model_physionet2025.th"), map_location=torch.device(device))
-    model = get_MultibranchBeats(alpha_config, beta_config, gamma_config, delta_config, epsilon_config, zeta_config, ['True'],device, leads=leads)
+    model = get_MultibranchBeats(alpha_config, beta_config, gamma_config,
+                                 delta_config, epsilon_config, zeta_config,
+                                 ['True'],device, leads=leads)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.leads = checkpoint['leads']
     model = model.to(device)
@@ -174,7 +174,14 @@ def run_model(record, model, verbose):
     # Extract the features.
     header = load_header(record)
     header_file = record + ".hea"
-    recording_full=utilityFunctions.load_and_equalize_recording(record, header, header_file, 400, leads)
+
+    try:
+        signal, fields = load_signals(header_file)
+    except Exception as e:
+        print(f"Skipping {header_file} and associated recording  because of {e}")
+        return 0.0, 0.0
+
+    recording_full=utilityFunctions.load_and_equalize_recording(signal, fields, header_file, 400)
     drift_removed_recording, bw_removed_recording, recording, signals, infos, peaks, rates = utilityFunctions.preprocess_recording(recording_full, header,  leads_idxs=utility_functions.leads_idxs_dict[len(leads)])
 
     if signals is None or infos is None or peaks is None or rates is None:
