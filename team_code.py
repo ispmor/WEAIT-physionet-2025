@@ -56,7 +56,7 @@ delta_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_siz
 epsilon_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, window_size, wavelet_features_size, beta_input_size=epsilon_input_size)
 zeta_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, window_size, wavelet_features_size, beta_input_size=zeta_input_size)
 
-leads_idx = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], dtype=np.float64)
+leads_idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
 ################################################################################
 #
@@ -135,13 +135,13 @@ def train_model(data_folder, model_folder, verbose):
     test_dataset = HDF5Dataset('./' + utilityFunctions.test_filename, recursive=False, load_data=False, data_cache_size=4, transform=None, leads=leads_idx)
     logger.info("Loaded validation dataset")
 
-    model = get_MultibranchBeats(alpha_config, beta_config, gamma_config, delta_config, epsilon_config, zeta_config, utilityFunctions.all_classes,device, leads=list(leads))
+    model = get_MultibranchBeats(alpha_config, beta_config, gamma_config, delta_config, epsilon_config, utilityFunctions.all_classes,device, leads=list(leads))
     training_config = TrainingConfig(batch_size=500,
                                     n_epochs_stop=early_stop,
                                     num_epochs=epochs,
                                     lr_rate=0.01,
                                     criterion=BCEWithLogitsLoss(pos_weight=weights),
-                                    optimizer=torch.optim.adam.Adam(model.parameters(), lr=0.01),
+                                    optimizer=torch.optim.Adam(model.parameters(), lr=0.01),
                                     device=device,
                                     model_repository=model_folder
                                     )
@@ -160,7 +160,7 @@ def train_model(data_folder, model_folder, verbose):
 def load_model(model_folder, verbose):
     checkpoint = torch.load(os.path.join(model_folder, "best_model_physionet2025.th"), map_location=torch.device(device))
     model = get_MultibranchBeats(alpha_config, beta_config, gamma_config,
-                                 delta_config, epsilon_config, zeta_config,
+                                 delta_config, epsilon_config, 
                                  ['True'],device, leads=leads)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.leads = checkpoint['leads']
@@ -176,13 +176,13 @@ def run_model(record, model, verbose):
     header_file = record + ".hea"
 
     try:
-        signal, fields = load_signals(header_file)
+        signal, fields = load_signals(record)
     except Exception as e:
         print(f"Skipping {header_file} and associated recording  because of {e}")
         return 0.0, 0.0
 
     recording_full=utilityFunctions.load_and_equalize_recording(signal, fields, header_file, 400)
-    drift_removed_recording, bw_removed_recording, recording, signals, infos, peaks, rates = utilityFunctions.preprocess_recording(recording_full, header,  leads_idxs=utility_functions.leads_idxs_dict[len(leads)])
+    drift_removed_recording, recording, signals, infos, peaks, rates = utilityFunctions.preprocess_recording(recording_full, header,  leads_idxs=utility_functions.leads_idxs_dict[len(leads)])
 
     if signals is None or infos is None or peaks is None or rates is None:
         probability_output = 0.0
@@ -190,7 +190,7 @@ def run_model(record, model, verbose):
         return binary_output, probability_output
 
 
-    recording_raw, recording_drift_removed, recording_bw_removed, rr_features, wavelet_features= utilityFunctions.one_file_training_data(recording, drift_removed_recording, bw_removed_recording, signals, infos, rates, utilityFunctions.window_size, peaks, header, leads)
+    recording_raw, recording_drift_removed, rr_features, wavelet_features= utilityFunctions.one_file_training_data(recording, drift_removed_recording, signals, infos, rates, utilityFunctions.window_size, peaks, header, leads)
     if len(recording_raw[0]) < 2000:
         probability_output = 0.0
         binary_output = 0.0
@@ -198,14 +198,13 @@ def run_model(record, model, verbose):
 
     recording_raw = torch.Tensor(recording_raw).to(device)
     recording_drift_removed = torch.Tensor(recording_drift_removed).to(device)
-    recording_bw_removed = torch.Tensor(recording_bw_removed).to(device)
     rr_features = torch.Tensor(rr_features).to(device)
     wavelet_features = torch.Tensor(wavelet_features).to(device)
 
-    batch = (recording_raw, recording_drift_removed, recording_bw_removed, None, rr_features, wavelet_features)
-    alpha_input, beta_input, gamma_input, delta_input, epsilon_input, zeta_input, _= batch_preprocessing(batch)
+    batch = (recording_raw, recording_drift_removed,  None, rr_features, wavelet_features)
+    alpha_input, beta_input, gamma_input, delta_input, epsilon_input, _= batch_preprocessing(batch)
     # Get the model outputs.
-    model_outputs = model(alpha_input, beta_input, gamma_input, delta_input, epsilon_input, zeta_input)
+    model_outputs = model(alpha_input, beta_input, gamma_input, delta_input, epsilon_input)
     probability_output = torch.mean(torch.nn.functional.sigmoid(model_outputs), 0).detach().cpu().numpy()[0]
     binary_output = float(probability_output > 0.5)
     return binary_output, probability_output

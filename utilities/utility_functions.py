@@ -14,6 +14,7 @@ import csv
 from .domain_knowledge_processing import analyse_recording, analysis_dict_to_array
 from .raw_signal_preprocessing import baseline_wandering_removal, wavelet_threshold, remove_baseline_drift
 from scipy.signal import resample
+import gc
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,7 @@ class UtilityFunctions:
 
 
 
-    def one_file_training_data(self, recording, drift_removed_recording, bw_removed_recording, signals, infos, rates, single_peak_length, peaks, header_file, leads):
+    def one_file_training_data(self, recording, drift_removed_recording, signals, infos, rates, single_peak_length, peaks, header_file, leads):
 
         x_raw = []
         x_drift_removed = []
@@ -133,7 +134,6 @@ class UtilityFunctions:
             if peak + self.window_size < recording_length:
                 signal_local = drift_removed_recording[:, peak: peak + self.window_size]
                 signal_local_raw = recording[:, peak: peak + self.window_size]
-                signal_local_bw = bw_removed_recording[:, peak: peak + self.window_size]
                 wavelet_features = self.get_wavelet_features(signal_local, 'db2')
                 peaks_considered.extend([p for p in peaks if peak <= p < peak+self.window_size])
             else:
@@ -143,7 +143,6 @@ class UtilityFunctions:
             logger.debug(f"Adding to X_features: {signal_local}")
             x_drift_removed.append(signal_local)
             x_raw.append(signal_local_raw)
-            x_baseline_removed.append(signal_local_bw)
             coeffs.append(wavelet_features)
 
         x_raw = np.array(x_raw, dtype=np.float64)
@@ -166,7 +165,7 @@ class UtilityFunctions:
                 raise
 
 
-        return x_raw, x_drift_removed, x_baseline_removed, rr_features, coeffs
+        return x_raw, x_drift_removed, rr_features, coeffs
 
 
 
@@ -177,11 +176,10 @@ class UtilityFunctions:
 
 
 
-    def preprocess_recording(self, recording, header, leads_idxs, bw_wavelet="sym10", bw_level=6, denoise_wavelet="db6", deniose_level=3, peaks_method="pantompkins1985", sampling_rate=400):
+    def preprocess_recording(self, recording, header, leads_idxs, denoise_wavelet="db6", deniose_level=3, peaks_method="pantompkins1985", sampling_rate=400):
         if recording is None:
             return (None, None, None, None, None, None, None)
         drift_removed_recording, _ = remove_baseline_drift(recording)
-        bw_removed_recording, _ = baseline_wandering_removal(recording, bw_wavelet,bw_level)
         signals = {}
         infos = {}
         rpeaks_avg = []
@@ -209,16 +207,15 @@ class UtilityFunctions:
 
         recording = np.nan_to_num(recording)
         drift_removed_recording = np.nan_to_num(drift_removed_recording)
-        bw_removed_recording = np.nan_to_num(bw_removed_recording)
         if len(rpeaks_avg) > 0:
             min_length = min([len(x) for x in rpeaks_avg])
             rpeaks_avg = np.array([rpeaks_avg[i][ :min_length] for i in range(len(rpeaks_avg))])
             peaks = np.mean(rpeaks_avg[:, ~np.any(np.isnan(rpeaks_avg), axis=0)], axis=0).astype(int)
             logger.debug(f"Peaks: {peaks}")
 
-            return (drift_removed_recording, bw_removed_recording, recording, signals, infos, peaks, rates)
+            return (drift_removed_recording, recording, signals, infos, peaks, rates)
         else:
-            return (drift_removed_recording, bw_removed_recording, recording, signals, infos, None, None)
+            return (drift_removed_recording, recording, signals, infos, None, None)
 
 
     def load_and_equalize_recording(self, signal, fields, header_file, sampling_rate):
@@ -263,7 +260,6 @@ class UtilityFunctions:
         rrset = grp.create_dataset("rr_features", (1, len(leads), self.rr_features_size), maxshape=(None, len(leads), self.rr_features_size), dtype='f', chunks=True)
         waveset = grp.create_dataset("wavelet_features", (1, len(leads), self.wavelet_features_size), maxshape=(None, len(leads), self.wavelet_features_size), dtype='f', chunks=(1, len(leads), self.wavelet_features_size))
         nodriftset = grp.create_dataset("drift_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size),dtype='f',chunks=(1, len(leads), self.window_size))
-        nobwset = grp.create_dataset("bw_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size), dtype='f',chunks=(1, len(leads), self.window_size))
         counter = 0
         for i in range(num_recordings):
             print(f"Iterating over {counter +1} out of {num_recordings} files - {header_files[i]}")
@@ -277,7 +273,7 @@ class UtilityFunctions:
                 current_label = 0
 
             try:
-                signal, fields = load_signals(header_files[i])
+                signal, fields = load_signals(header_files[i][:-4])
             except Exception as e:
                 print(f"Skipping {header_files[i]} and associated recording  because of {e}")
                 continue
@@ -296,10 +292,10 @@ class UtilityFunctions:
             if recording_full is None:
                 print(f"Failed to load any data from {recording_files[i]}, skipping")
                 continue
-            if max(recording_full) == 0 and min(recording_full) == 0:
+            if recording_full.max() == 0 and recording_full.min() == 0:
                 print("Skipping {recording_files[i]} as recording full seems to be none or empty")
                 continue
-            drift_removed_recording, bw_removed_recording, recording, signals, infos, peaks, rates = self.preprocess_recording(recording_full, header,  leads_idxs=leads_idxs_dict[len(leads)])
+            drift_removed_recording, recording, signals, infos, peaks, rates = self.preprocess_recording(recording_full, header,  leads_idxs=leads_idxs_dict[len(leads)])
             if signals is None or infos is None or peaks is None or rates is None:
                 if signals is None:
                     print(f"Signals is none")
@@ -310,7 +306,7 @@ class UtilityFunctions:
                 if rates is None:
                     print("Rates is none")
                 continue
-            recording_raw, recording_drift_removed, recording_bw_removed, rr_features, wavelet_features = self.one_file_training_data(recording, drift_removed_recording, bw_removed_recording, signals, infos, rates, self.window_size,peaks, header_files[i], leads=leads)
+            recording_raw, recording_drift_removed, rr_features, wavelet_features = self.one_file_training_data(recording, drift_removed_recording, signals, infos, rates, self.window_size,peaks, header_files[i], leads=leads)
             new_windows = recording_raw.shape[0]
             if new_windows == 0:
                 logger.debug("New windows is 0! SKIPPING")
@@ -335,8 +331,6 @@ class UtilityFunctions:
                 waveset[-new_windows:] = wavelet_features
             nodriftset.resize(nodriftset.shape[0] + new_windows, axis=0)
             nodriftset[-new_windows:] = recording_drift_removed
-            nobwset.resize(nobwset.shape[0] + new_windows, axis=0)
-            nobwset[-new_windows:] = recording_bw_removed
             print(f"Positive class counter after file: {pos_signals}")
             print(f"Total class counter after file: {all_signals_entries}")
         print(f'Successfully created {group} dataset {filename}')

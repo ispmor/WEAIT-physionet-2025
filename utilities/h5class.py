@@ -52,17 +52,14 @@ class HDF5Dataset(data.Dataset):
         # get data
         x_raw = self.get_data("data", index)
         x_drift_removed = self.get_data("drift_removed", index)
-        x_bw_removed = self.get_data("bw_removed", index)
 
 
         if self.transform:
             x_raw = self.transform(x_raw)
             x_drift_removed = self.transform(x_drift_removed)
-            x_bw_removed = self.transform(x_bw_removed)
         else:
             x_raw = torch.from_numpy(np.array(x_raw))
             x_drift_removed = torch.from_numpy(np.array(x_drift_removed))
-            x_bw_removed = torch.from_numpy(np.array(x_bw_removed))
 
         # get label
         y = self.get_data("label", index)
@@ -74,7 +71,7 @@ class HDF5Dataset(data.Dataset):
         wavelet_features = self.get_data("wavelet_features", index)
         wavelet_features = torch.from_numpy(np.array(wavelet_features))
 
-        return (x_raw, x_drift_removed, x_bw_removed, y, rr_features, wavelet_features)
+        return (x_raw, x_drift_removed, y, rr_features, wavelet_features)
 
 
         #TODO: dodać zwracanie array wavelet i może r features?

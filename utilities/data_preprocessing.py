@@ -115,10 +115,9 @@ def domain_at_mlp(batch):
 
 
 def multibranch_division(batch):
-    x_raw, x_drift_removed, x_bw_removed, y, rr_features, wavelet_features = batch
+    x_raw, x_drift_removed,  y, rr_features, wavelet_features = batch
     x_raw = torch.transpose(x_raw, 1, 2)
     x_drift_removed = torch.transpose(x_drift_removed, 1, 2)
-    x_bw_removed= torch.transpose(x_bw_removed, 1, 2)
     rr_features = torch.transpose(rr_features, 1, 2)
     wavelet_features = torch.transpose(wavelet_features, 1, 2)
     pre_pca = torch.hstack((x_drift_removed[:, ::2, :], wavelet_features, rr_features))
@@ -133,8 +132,7 @@ def multibranch_division(batch):
     gamma_input = pca_features
     delta_input = rr_features
     epsilon_input = x_drift_removed
-    zeta_input = x_bw_removed
 
-    logger.debug(f"Shape nf alpha_input: {alpha_input.shape}\nShape of beta_input: {beta_input.shape}\nGamma shape: {gamma_input.shape}\nDelta input shape: {delta_input.shape}\nEpsilon input shape: {epsilon_input.shape}\nZeta input shape: {zeta_input.shape}")
+    logger.debug(f"Shape nf alpha_input: {alpha_input.shape}\nShape of beta_input: {beta_input.shape}\nGamma shape: {gamma_input.shape}\nDelta input shape: {delta_input.shape}\nEpsilon input shape: {epsilon_input.shape}")
 
-    return alpha_input, beta_input, gamma_input, delta_input, epsilon_input, zeta_input, y
+    return alpha_input, beta_input, gamma_input, delta_input, epsilon_input, y
