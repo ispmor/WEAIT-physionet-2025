@@ -155,12 +155,10 @@ def train_model(data_folder, model_folder, verbose):
     train_X.extend(sami_trop_training)
     test_X.extend(sami_trop_test)
 
-    print(train_X)
-    print(len(train_X))
-    print(len(train_X[0]))
     del labels
 
     utilityFunctions.prepare_h5_dataset(leads,  train_X, test_X)
+    del train_X, test_X
     training_dataset = HDF5Dataset('./' + utilityFunctions.training_filename, recursive=False, load_data=False, data_cache_size=4, transform=None, leads=leads_idx)
     logger.info("Loaded training dataset")
     weights = utilityFunctions.load_training_weights()
