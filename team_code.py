@@ -97,11 +97,15 @@ def train_model(data_folder, model_folder, verbose):
     if num_records == 0:
         raise FileNotFoundError('No data were provided.')
 
-    headers = []
-    labels = np.zeros(num_records, dtype=bool)
 
     record_files = []
     header_files = []
+    total_signals = []
+    total_fields = []
+    sami_trop_headers = []
+    sami_trop_recordings = []
+    sami_signals = []
+    sami_fields = []
 
     # Iterate over the records.
     for i in range(num_records):
@@ -110,21 +114,50 @@ def train_model(data_folder, model_folder, verbose):
             print(f'- {i+1:>{width}}/{num_records}: {records[i]}...')
 
         record = os.path.join(data_folder, records[i])
+
+        try:
+            signals, fields = load_signals(record)
+        except Exception as e:
+            print(f"Skipping {record}.hea and associated recording  because of {e}")
+            continue
+
+        if "comments" in fields:
+            source_info = [x for x in fields["comments"] if "Source" in x]
+            if len(source_info) > 0:
+                if "CODE" in source_info[0]:
+                    if random.random() > 0.9:
+                        print(f"Skipping {record}.hea and associated recording  because fate decided")
+                        continue
+                        
+                if "SaMi-Trop" in source_info[0]:
+                    sami_trop_headers.append(os.path.join(data_folder, get_header_file(records[i])))
+                    sami_trop_recordings.append(record)
+                    sami_signals.append(signals)
+                    sami_fields.append(fields)
+                    
+                    print(f"Found SaMi-Trop {record}, adding aside")
+                    continue
+        
         header_files.append(os.path.join(data_folder, get_header_file(records[i])))
         record_files.append(record)
+        total_signals.append(signals)
+        total_fields.append(fields)
+        
 
-        header = load_header(record)
-        headers.append(header)
-        try:
-            labels[i] = get_label(header)
-        except Exception:
-            print("Label not found, asigning 0")
-            labels[i] = 0
+    totalX = list(zip(record_files, header_files, total_signals, total_fields))
+    totalSami = list(zip(sami_trop_recordings, sami_trop_headers, sami_signals, sami_fields))
 
-    totalX = list(zip(record_files, header_files))
+    labels = np.zeros(len(totalX), dtype=bool)
 
     train_X, test_X, _, _ = train_test_split(totalX, labels, test_size=0.25, random_state=42)
+    sami_trop_training, sami_trop_test, _, _ = train_test_split(totalSami, np.ones(len(sami_trop_recordings)), test_size=0.25, random_state=42)
 
+    train_X.extend(sami_trop_training)
+    test_X.extend(sami_trop_test)
+
+    print(train_X)
+    print(len(train_X))
+    print(len(train_X[0]))
     del labels
 
     utilityFunctions.prepare_h5_dataset(leads,  train_X, test_X)

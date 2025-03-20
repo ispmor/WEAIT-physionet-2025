@@ -15,6 +15,7 @@ from .domain_knowledge_processing import analyse_recording, analysis_dict_to_arr
 from .raw_signal_preprocessing import baseline_wandering_removal, wavelet_threshold, remove_baseline_drift
 from scipy.signal import resample
 import gc
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -78,14 +79,8 @@ class UtilityFunctions:
 
     def prepare_h5_dataset(self, leads, single_fold_data_training, single_fold_data_test):
         print(f"Preparing HDF5 dataset from WFDB files")
-        training_recording_files = [x[0] for x in single_fold_data_training]
-        training_header_files = [x[1] for x in single_fold_data_training]
-        test_recording_files = [x[0] for x in single_fold_data_test]
-        test_header_files = [x[1] for x in single_fold_data_test]
-
-
-        training_data_length = len(training_recording_files)
-        test_data_length = len(test_recording_files)
+        training_data_length = len(single_fold_data_training)
+        test_data_length = len(single_fold_data_test)
 
         training_filename = self.training_filename
         test_filename = self.test_filename
@@ -93,14 +88,14 @@ class UtilityFunctions:
 
         if not os.path.isfile(training_filename):
             print(f"{training_filename} not found, creating database")
-            positive_class_count, all_signals_count = self.create_hdf5_db(training_data_length, training_header_files, training_recording_files,  leads, isTraining=1, filename=training_filename)
+            positive_class_count, all_signals_count = self.create_hdf5_db(training_data_length, single_fold_data_training,  leads, isTraining=1, filename=training_filename)
             np.savetxt(self.training_weights_filename, np.asarray(np.vstack([positive_class_count, all_signals_count])), delimiter=',')
 
 
 
         if not os.path.isfile(test_filename):
             print(f"{test_filename} not found, creating database")
-            _, _ = self.create_hdf5_db(test_data_length,  test_header_files, test_recording_files, leads, isTraining=0, filename=test_filename)
+            _, _ = self.create_hdf5_db(test_data_length,  single_fold_data_test, leads, isTraining=0, filename=test_filename)
 
 
 
@@ -239,7 +234,7 @@ class UtilityFunctions:
 
 
 
-    def create_hdf5_db(self, num_recordings, header_files, recording_files, leads, isTraining = 1, filename=None, sampling_rate=400):
+    def create_hdf5_db(self, num_recordings, data, leads, isTraining = 1, filename=None, sampling_rate=400):
         group = None
         if isTraining == 1:
             group = 'training'
@@ -260,12 +255,12 @@ class UtilityFunctions:
         rrset = grp.create_dataset("rr_features", (1, len(leads), self.rr_features_size), maxshape=(None, len(leads), self.rr_features_size), dtype='f', chunks=True)
         waveset = grp.create_dataset("wavelet_features", (1, len(leads), self.wavelet_features_size), maxshape=(None, len(leads), self.wavelet_features_size), dtype='f', chunks=(1, len(leads), self.wavelet_features_size))
         nodriftset = grp.create_dataset("drift_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size),dtype='f',chunks=(1, len(leads), self.window_size))
-        counter = 0
-        for i in range(num_recordings):
-            print(f"Iterating over {counter +1} out of {num_recordings} files - {header_files[i]}")
-            counter += 1
+        i = 0
+        for recording_file, header_file, total_signals, total_fields in data:
+        
+            print(f"Iterating over {i +1} out of {num_recordings} files - {header_file}")
             # Load header and recording.
-            header = load_header(header_files[i])
+            header = load_header(header_file)
             try:
                 current_label= get_label(header)
             except Exception as e:
@@ -273,9 +268,10 @@ class UtilityFunctions:
                 current_label = 0
 
             try:
-                signal, fields = load_signals(header_files[i][:-4])
+                signal = total_signals
+                fields = total_fields
             except Exception as e:
-                print(f"Skipping {header_files[i]} and associated recording  because of {e}")
+                print(f"Skipping {header_file} and associated recording  because of {e}")
                 continue
 
             weight_multiplier = 1
@@ -288,9 +284,9 @@ class UtilityFunctions:
                         weight_multiplier = 10
 
 
-            recording_full = self.load_and_equalize_recording(signal, fields, header_files[i], sampling_rate)
+            recording_full = self.load_and_equalize_recording(signal, fields, header_file, sampling_rate)
             if recording_full is None:
-                print(f"Failed to load any data from {recording_files[i]}, skipping")
+                print(f"Failed to load any data from {recording_file}, skipping")
                 continue
             if recording_full.max() == 0 and recording_full.min() == 0:
                 print("Skipping {recording_files[i]} as recording full seems to be none or empty")
@@ -306,12 +302,19 @@ class UtilityFunctions:
                 if rates is None:
                     print("Rates is none")
                 continue
-            recording_raw, recording_drift_removed, rr_features, wavelet_features = self.one_file_training_data(recording, drift_removed_recording, signals, infos, rates, self.window_size,peaks, header_files[i], leads=leads)
+            recording_raw, recording_drift_removed, rr_features, wavelet_features = self.one_file_training_data(recording, drift_removed_recording, signals, infos, rates, self.window_size,peaks, header_file, leads=leads)
+
+            recording_raw = np.repeat(recording_raw, weight_multiplier, axis=0)
+            recording_drift_removed = np.repeat(recording_drift_removed, weight_multiplier, axis=0)
+            rr_features = np.repeat(rr_features, weight_multiplier, axis=0)
+            wavelet_features = np.repeat(wavelet_features, weight_multiplier, axis=0)
+
+
             new_windows = recording_raw.shape[0]
             if new_windows == 0:
                 logger.debug("New windows is 0! SKIPPING")
                 continue
-            all_signals_entries += weight_multiplier*new_windows
+            all_signals_entries += new_windows
             label_pack = None
             if current_label:
                 label_pack = np.ones((new_windows, 1), dtype=np.bool_)
@@ -333,6 +336,7 @@ class UtilityFunctions:
             nodriftset[-new_windows:] = recording_drift_removed
             print(f"Positive class counter after file: {pos_signals}")
             print(f"Total class counter after file: {all_signals_entries}")
+            i += 1
         print(f'Successfully created {group} dataset {filename}')
         return pos_signals, all_signals_entries
 
