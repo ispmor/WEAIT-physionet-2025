@@ -100,12 +100,8 @@ def train_model(data_folder, model_folder, verbose):
 
     record_files = []
     header_files = []
-    total_signals = []
-    total_fields = []
     sami_trop_headers = []
     sami_trop_recordings = []
-    sami_signals = []
-    sami_fields = []
 
     # Iterate over the records.
     for i in range(num_records):
@@ -115,37 +111,25 @@ def train_model(data_folder, model_folder, verbose):
 
         record = os.path.join(data_folder, records[i])
 
-        try:
-            signals, fields = load_signals(record)
-        except Exception as e:
-            print(f"Skipping {record}.hea and associated recording  because of {e}")
-            continue
-
-        if "comments" in fields:
-            source_info = [x for x in fields["comments"] if "Source" in x]
-            if len(source_info) > 0:
-                if "CODE" in source_info[0]:
-                    if random.random() > 0.9:
-                        print(f"Skipping {record}.hea and associated recording  because fate decided")
-                        continue
-                        
-                if "SaMi-Trop" in source_info[0]:
-                    sami_trop_headers.append(os.path.join(data_folder, get_header_file(records[i])))
-                    sami_trop_recordings.append(record)
-                    sami_signals.append(signals)
-                    sami_fields.append(fields)
-                    
-                    print(f"Found SaMi-Trop {record}, adding aside")
+        header = load_header(record)
+        splitted = header.split("\n")
+        source_info = [x for x in splitted if "Source" in x]
+        if len(source_info) > 0:
+            if "CODE" in source_info[0]:
+                if random.random() > 0.4:
                     continue
+                        
+            if "SaMi-Trop" in source_info[0]:
+                sami_trop_headers.append(os.path.join(data_folder, get_header_file(records[i])))
+                sami_trop_recordings.append(record)     
+                continue
         
         header_files.append(os.path.join(data_folder, get_header_file(records[i])))
         record_files.append(record)
-        total_signals.append(signals)
-        total_fields.append(fields)
         
 
-    totalX = list(zip(record_files, header_files, total_signals, total_fields))
-    totalSami = list(zip(sami_trop_recordings, sami_trop_headers, sami_signals, sami_fields))
+    totalX = list(zip(record_files, header_files))
+    totalSami = list(zip(sami_trop_recordings, sami_trop_headers))
 
     labels = np.zeros(len(totalX), dtype=bool)
 

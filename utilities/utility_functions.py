@@ -219,7 +219,6 @@ class UtilityFunctions:
                 signal = signal[:self.window_size * 10]
 
             signal = np.transpose(signal)
-            print(fields)
             recording = np.array(signal, dtype=np.float32)
             freq = fields["fs"]
             if freq != float(sampling_rate):
@@ -256,7 +255,7 @@ class UtilityFunctions:
         waveset = grp.create_dataset("wavelet_features", (1, len(leads), self.wavelet_features_size), maxshape=(None, len(leads), self.wavelet_features_size), dtype='f', chunks=(1, len(leads), self.wavelet_features_size))
         nodriftset = grp.create_dataset("drift_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size),dtype='f',chunks=(1, len(leads), self.window_size))
         i = 0
-        for recording_file, header_file, total_signals, total_fields in data:
+        for recording_file, header_file in data:
         
             print(f"Iterating over {i +1} out of {num_recordings} files - {header_file}")
             # Load header and recording.
@@ -268,8 +267,7 @@ class UtilityFunctions:
                 current_label = 0
 
             try:
-                signal = total_signals
-                fields = total_fields
+                signal, fields = load_signals(recording_file)
             except Exception as e:
                 print(f"Skipping {header_file} and associated recording  because of {e}")
                 continue
