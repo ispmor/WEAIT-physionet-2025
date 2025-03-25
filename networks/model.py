@@ -259,6 +259,8 @@ class Nbeats_beta(nn.Module):
 
         self.fc = nn.Linear( input_features_size_b * self.input_size,
                             num_classes)  # hidden_size, 128)  # fully connected 1# fully connected last layer
+        self.dropoutNBEATS = nn.Dropout(0.5)
+        self.dropoutFC = nn.Dropout(0.5)
         logger.debug(f"{self}")
 
 
@@ -267,10 +269,12 @@ class Nbeats_beta(nn.Module):
         beta_flattened = torch.flatten(beta_input, start_dim=1)
         logger.debug(f"NBeats_beta INPUT FLATTENED shape: {beta_flattened.shape}")
         _, output_beta = self.nbeats_beta(beta_flattened)  # lstm with input, hidden, and internal state
+        output_beta = self.dropoutNBEATS(output_beta)
         logger.debug(f"Nbeats_beta OUTPUT shape: {output_beta.shape}")
         tmp = torch.squeeze(output_beta)
         out = self.relu(tmp)  # relu
         out = self.fc(out)  # Final Output
+        out = self.dropoutFC(out)
         return out
 
 

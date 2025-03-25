@@ -116,7 +116,7 @@ def train_model(data_folder, model_folder, verbose):
         source_info = [x for x in splitted if "Source" in x]
         if len(source_info) > 0:
             if "CODE" in source_info[0]:
-                if random.random() > 0.4:
+                if random.random() > 0.1:
                     continue
                         
             if "SaMi-Trop" in source_info[0]:
@@ -154,9 +154,9 @@ def train_model(data_folder, model_folder, verbose):
     training_config = TrainingConfig(batch_size=500,
                                     n_epochs_stop=early_stop,
                                     num_epochs=epochs,
-                                    lr_rate=0.01,
+                                    lr_rate=0.001,
                                     criterion=BCEWithLogitsLoss(pos_weight=weights),
-                                    optimizer=torch.optim.Adam(model.parameters(), lr=0.01),
+                                    optimizer=torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.001),
                                     device=device,
                                     model_repository=model_folder
                                     )

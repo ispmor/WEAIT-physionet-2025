@@ -279,7 +279,7 @@ class UtilityFunctions:
                     if "CODE" in source_info[0]:
                         weight_multiplier = 1
                     if "SaMi-Trop" in source_info[0]:
-                        weight_multiplier = 10
+                        weight_multiplier = 30
 
 
             recording_full = self.load_and_equalize_recording(signal, fields, header_file, sampling_rate)
