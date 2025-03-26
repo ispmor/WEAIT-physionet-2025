@@ -46,6 +46,7 @@ alpha_layers=args.alpha_layers
 beta_hidden=args.beta_hidden
 beta_layers=args.beta_layers
 epochs=args.epochs
+debug_mode=args.debug_mode
 leads=('I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6')
 early_stop=args.early_stop
 device = torch.device(f"cuda:{gpu_number}" if torch.cuda.is_available() else "cpu")
@@ -69,7 +70,6 @@ leads_idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
 # Train your model.
 def train_model(data_folder, model_folder, verbose):
-    debug_mode = verbose
     execution_time=datetime.now()
     date = execution_time.date()
     time = execution_time.time()
@@ -77,6 +77,8 @@ def train_model(data_folder, model_folder, verbose):
     tensorboardWriter: SummaryWriter = SummaryWriter(f"runs/physionet-2025")
     os.makedirs(os.path.dirname(log_filename), exist_ok=True)
     logging_level = logging.INFO
+    if debug_mode:
+        logging_level = logging.DEBUG
 
     logging.basicConfig(filename=log_filename,
                       level=logging_level,
@@ -115,14 +117,14 @@ def train_model(data_folder, model_folder, verbose):
         splitted = header.split("\n")
         source_info = [x for x in splitted if "Source" in x]
         if len(source_info) > 0:
-            if "CODE" in source_info[0]:
-                if random.random() > 0.1:
-                    continue
                         
             if "SaMi-Trop" in source_info[0]:
                 sami_trop_headers.append(os.path.join(data_folder, get_header_file(records[i])))
                 sami_trop_recordings.append(record)     
                 continue
+            else:
+                if random.random() > 0.5:
+                    continue
         
         header_files.append(os.path.join(data_folder, get_header_file(records[i])))
         record_files.append(record)
@@ -133,8 +135,8 @@ def train_model(data_folder, model_folder, verbose):
 
     labels = np.zeros(len(totalX), dtype=bool)
 
-    train_X, test_X, _, _ = train_test_split(totalX, labels, test_size=0.25, random_state=42)
-    sami_trop_training, sami_trop_test, _, _ = train_test_split(totalSami, np.ones(len(sami_trop_recordings)), test_size=0.25, random_state=42)
+    train_X, test_X, _, _ = train_test_split(totalX, labels, test_size=0.3, random_state=42)
+    sami_trop_training, sami_trop_test, _, _ = train_test_split(totalSami, np.ones(len(sami_trop_recordings)), test_size=0.3, random_state=42)
 
     train_X.extend(sami_trop_training)
     test_X.extend(sami_trop_test)
@@ -154,9 +156,9 @@ def train_model(data_folder, model_folder, verbose):
     training_config = TrainingConfig(batch_size=500,
                                     n_epochs_stop=early_stop,
                                     num_epochs=epochs,
-                                    lr_rate=0.001,
+                                    lr_rate=0.01,
                                     criterion=BCEWithLogitsLoss(pos_weight=weights),
-                                    optimizer=torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.001),
+                                    optimizer=torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.01),
                                     device=device,
                                     model_repository=model_folder
                                     )
@@ -185,10 +187,25 @@ def load_model(model_folder, verbose):
 # Run your trained model. This function is *required*. You should edit this function to add your code, but do *not* change the
 # arguments of this function.
 def run_model(record, model, verbose):
+    execution_time=datetime.now()
+    date = execution_time.date()
+    time = execution_time.time()
+    log_filename =f'logs/{name}/{date}/{time}-TEST.log'
+    logging_level = logging.INFO
+    if debug_mode:
+        logging_level = logging.DEBUG
+
+    logging.basicConfig(filename=log_filename,
+                      level=logging_level,
+                      format='[%(asctime)s %(levelname)-8s %(filename)s:%(lineno)s]  %(message)s',
+                      datefmt='%Y-%m-%d %H:%M:%S')
+    logger.info(f"!!! Experiment: {name} !!!")
+
     utilityFunctions = UtilityFunctions(device, rr_features_size=delta_input_size, window_size=window_size, wavelet_features_size=wavelet_features_size)
     # Extract the features.
     header = load_header(record)
     header_file = record + ".hea"
+    print(f"Processing {header_file}")
 
     try:
         signal, fields = load_signals(record)
@@ -198,31 +215,46 @@ def run_model(record, model, verbose):
 
     recording_full=utilityFunctions.load_and_equalize_recording(signal, fields, header_file, 400)
     drift_removed_recording, recording, signals, infos, peaks, rates = utilityFunctions.preprocess_recording(recording_full, header,  leads_idxs=utility_functions.leads_idxs_dict[len(leads)])
+            
+    dataset_label = np.array([0,0,1]) #We have 3 labels known now - CODE, SAMI-TROP and Unknown, default is unknown
+    if "comments" in fields:
+        source_info = [x for x in fields["comments"] if "Source" in x]
+        if len(source_info) > 0:
+            if "CODE" in source_info[0]:
+                dataset_label = np.array([1,0,0])
+                        
+            elif "SaMi-Trop" in source_info[0]:
+                dataset_label = np.array([0,1,0])
+                    
 
     if signals is None or infos is None or peaks is None or rates is None:
+        print("Failed to extract needed data - returning zeros")
         probability_output = 0.0
         binary_output = 0.0
         return binary_output, probability_output
 
 
     recording_raw, recording_drift_removed, rr_features, wavelet_features= utilityFunctions.one_file_training_data(recording, drift_removed_recording, signals, infos, rates, utilityFunctions.window_size, peaks, header, leads)
-    if len(recording_raw[0]) < 2000:
-        probability_output = 0.0
-        binary_output = 0.0
-        return binary_output, probability_output
+
+    dataset_label = torch.Tensor(np.array([dataset_label] * recording_raw.shape[0])).to(device)
 
     recording_raw = torch.Tensor(recording_raw).to(device)
     recording_drift_removed = torch.Tensor(recording_drift_removed).to(device)
     rr_features = torch.Tensor(rr_features).to(device)
     wavelet_features = torch.Tensor(wavelet_features).to(device)
 
-    batch = (recording_raw, recording_drift_removed,  None, rr_features, wavelet_features)
-    alpha_input, beta_input, gamma_input, delta_input, epsilon_input, _= batch_preprocessing(batch)
+    batch = (recording_raw, recording_drift_removed,  None, rr_features, wavelet_features, dataset_label)
+    alpha_input, beta_input, gamma_input, delta_input, epsilon_input, dataset_label, _= batch_preprocessing(batch)
     # Get the model outputs.
-    model_outputs = model(alpha_input, beta_input, gamma_input, delta_input, epsilon_input)
-    probability_output = torch.mean(torch.nn.functional.sigmoid(model_outputs), 0).detach().cpu().numpy()[0]
-    binary_output = float(probability_output > 0.5)
-    return binary_output, probability_output
+    try:
+        model_outputs = model(alpha_input, beta_input, gamma_input, delta_input, epsilon_input, dataset_label)
+        probability_output = torch.mean(torch.nn.functional.sigmoid(model_outputs), 0).detach().cpu().numpy()[0]
+        binary_output = float(probability_output > 0.5)
+        return binary_output, probability_output
+    except Exception as e:
+        print(f"Model failed  because of {e}")
+        logger.debug(f"Failed to run model because of {e}",exc_info=True)
+        return 0.0, 0.0
 
 ################################################################################
 #

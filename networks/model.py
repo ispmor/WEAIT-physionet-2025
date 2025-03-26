@@ -271,7 +271,7 @@ class Nbeats_beta(nn.Module):
         _, output_beta = self.nbeats_beta(beta_flattened)  # lstm with input, hidden, and internal state
         output_beta = self.dropoutNBEATS(output_beta)
         logger.debug(f"Nbeats_beta OUTPUT shape: {output_beta.shape}")
-        tmp = torch.squeeze(output_beta)
+        tmp = output_beta
         out = self.relu(tmp)  # relu
         out = self.fc(out)  # Final Output
         out = self.dropoutFC(out)
@@ -403,19 +403,21 @@ class MultibranchBeats(nn.Module):
         self.modelD = modelD
         self.modelE = modelE
         self.classes = classes
-        self.linear = nn.Linear( 5 * len(classes), len(classes))
+        self.linear = nn.Linear( 5 * len(classes) + 3, len(classes)) #+3 in order to add one-hot-encoded dataset label
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, alpha_input, beta_input, gamma_input, delta_input, epsilon_input):
+    def forward(self, alpha_input, beta_input, gamma_input, delta_input, epsilon_input, dataset_label):
         logger.debug(f"Alpha input shape: {alpha_input.shape}\nBeta input shape: {beta_input.shape}\nGamma input shape: {gamma_input.shape}\nDelta input shape: {delta_input.shape}")
+        logger.debug(f"Dataset label: {dataset_label.shape}")
 
         outA = self.modelA(alpha_input)
         outB = self.modelB(beta_input)
         outC = self.modelC(gamma_input)
         outD = self.modelD(delta_input)
         outE = self.modelE(epsilon_input)
+        logger.debug(f"Alpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}, Epsilon output shape: {outE.shape}, dataset label shape: {dataset_label.shape}")
 
-        out_concat = F.relu(torch.cat((outA, outB, outC, outD, outE), dim=1))
+        out_concat = F.relu(torch.cat((outA, outB, outC, outD, outE, dataset_label), dim=1))
         out = self.linear(out_concat)
         return out
 

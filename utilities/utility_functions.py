@@ -251,6 +251,7 @@ class UtilityFunctions:
         grp = h5file.create_group(group)
         dset = grp.create_dataset("data", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size), dtype='f', chunks=(1, len(leads), self.window_size))
         lset = grp.create_dataset("label", (1,1), maxshape=(None, 1), dtype='f', chunks=(1, 1))
+        dataset = grp.create_dataset("dataset", (1,3), maxshape=(None, 3), dtype='f', chunks=(1, 3))
         rrset = grp.create_dataset("rr_features", (1, len(leads), self.rr_features_size), maxshape=(None, len(leads), self.rr_features_size), dtype='f', chunks=True)
         waveset = grp.create_dataset("wavelet_features", (1, len(leads), self.wavelet_features_size), maxshape=(None, len(leads), self.wavelet_features_size), dtype='f', chunks=(1, len(leads), self.wavelet_features_size))
         nodriftset = grp.create_dataset("drift_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size),dtype='f',chunks=(1, len(leads), self.window_size))
@@ -273,13 +274,20 @@ class UtilityFunctions:
                 continue
 
             weight_multiplier = 1
+            dataset_label = np.array([0,0,1]) #We have 3 labels known now - CODE, SAMI-TROP and Unknown, default is unknown
             if "comments" in fields:
                 source_info = [x for x in fields["comments"] if "Source" in x]
                 if len(source_info) > 0:
                     if "CODE" in source_info[0]:
                         weight_multiplier = 1
-                    if "SaMi-Trop" in source_info[0]:
+                        dataset_label = np.array([1,0,0])
+                        
+                    elif "SaMi-Trop" in source_info[0]:
                         weight_multiplier = 30
+                        dataset_label = np.array([0,1,0])
+                    
+
+
 
 
             recording_full = self.load_and_equalize_recording(signal, fields, header_file, sampling_rate)
@@ -306,9 +314,10 @@ class UtilityFunctions:
             recording_drift_removed = np.repeat(recording_drift_removed, weight_multiplier, axis=0)
             rr_features = np.repeat(rr_features, weight_multiplier, axis=0)
             wavelet_features = np.repeat(wavelet_features, weight_multiplier, axis=0)
-
-
+            
             new_windows = recording_raw.shape[0]
+            dataset_label = np.array(dataset_label * new_windows)
+            
             if new_windows == 0:
                 logger.debug("New windows is 0! SKIPPING")
                 continue
@@ -323,6 +332,8 @@ class UtilityFunctions:
             dset[-new_windows:] = recording_raw
             lset.resize(lset.shape[0] + new_windows, axis=0)
             lset[-new_windows:] = label_pack
+            dataset.resize(dataset.shape[0] + new_windows, axis=0)
+            dataset[-new_windows:] = dataset_label
             rrset.resize(rrset.shape[0] + new_windows, axis=0)
             rrset[-new_windows:] = rr_features
             waveset.resize(waveset.shape[0] + new_windows, axis=0)

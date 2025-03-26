@@ -50,8 +50,8 @@ class NetworkTrainer:
         for batch in training_data_loader:
             local_step += 1
             model.train()
-            alpha_input, beta_input, gamma_input, delta_input, epsilon_input, y = batch_preprocessing(batch)
-            forecast = model(alpha_input.to(self.training_config.device), beta_input.to(self.training_config.device), gamma_input.to(self.training_config.device), delta_input.to(self.training_config.device), epsilon_input.to(self.training_config.device))
+            alpha_input, beta_input, gamma_input, delta_input, epsilon_input, dataset_label, y = batch_preprocessing(batch)
+            forecast = model(alpha_input.to(self.training_config.device), beta_input.to(self.training_config.device), gamma_input.to(self.training_config.device), delta_input.to(self.training_config.device), epsilon_input.to(self.training_config.device), dataset_label.to(self.training_config.device))
 
             loss = self.training_config.criterion(forecast, y.to(self.training_config.device))  # torch.zeros(size=(16,)))
             epoch_loss.append(loss)
@@ -76,8 +76,8 @@ class NetworkTrainer:
         with torch.no_grad():
             model.eval()
             for batch in validation_data_loader:
-                alpha_input, beta_input, gamma_input, delta_input, epsilon_input, y = batch_preprocessing(batch)
-                forecast = model(alpha_input.to(self.training_config.device), beta_input.to(self.training_config.device), gamma_input.to(self.training_config.device), delta_input.to(self.training_config.device), epsilon_input.to(self.training_config.device))
+                alpha_input, beta_input, gamma_input, delta_input, epsilon_input, dataset_label, y = batch_preprocessing(batch)
+                forecast = model(alpha_input.to(self.training_config.device), beta_input.to(self.training_config.device), gamma_input.to(self.training_config.device), delta_input.to(self.training_config.device), epsilon_input.to(self.training_config.device), dataset_label.to(self.training_config.device))
 
                 loss = self.training_config.criterion(forecast, y.to(self.training_config.device))
                 epoch_loss.append(loss)

@@ -70,8 +70,11 @@ class HDF5Dataset(data.Dataset):
 
         wavelet_features = self.get_data("wavelet_features", index)
         wavelet_features = torch.from_numpy(np.array(wavelet_features))
+        
+        dataset = self.get_data("dataset", index)
+        dataset = torch.from_numpy(np.array(dataset))
 
-        return (x_raw, x_drift_removed, y, rr_features, wavelet_features)
+        return (x_raw, x_drift_removed, y, rr_features, wavelet_features, dataset)
 
 
         #TODO: dodać zwracanie array wavelet i może r features?
@@ -158,7 +161,7 @@ class HDF5Dataset(data.Dataset):
 
         # get new cache_idx assigned by _load_data_info
         cache_idx = self.get_data_infos(type)[0]['cache_idx']
-        if type in "label":
+        if type in "label" or "dataset":
             return self.data_cache[fp][cache_idx][i]
         else:
             return self.data_cache[fp][cache_idx][i][self.leads]
