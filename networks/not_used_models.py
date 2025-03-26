@@ -1,4 +1,63 @@
 
+class Nbeats_alpha(nn.Module):
+    def __init__(self,
+                 input_size,
+                 num_classes,
+                 hidden_size,
+                 num_layers,
+                 seq_length,
+                 device,
+                 classes=[],
+                 model_type='alpha',
+                 input_features_size_a1=350,
+                 input_features_size_a2=185):
+        super(Nbeats_alpha, self).__init__()
+
+        self.num_classes = num_classes  # number of classes
+        self.num_layers = num_layers  # number of layers
+        self.input_size = input_size  # input size
+        self.hidden_size = hidden_size  # hidden state
+        self.seq_length = seq_length  # sequence length
+        self.model_type = model_type
+        self.device=device
+        self.classes = classes
+        self.relu = nn.ReLU()
+
+        self.nbeats_alpha1 = NBeatsNet(stack_types=[NBeatsNet.GENERIC_BLOCK],
+                                       nb_blocks_per_stack=self.num_layers,
+                                       target_size=num_classes,
+                                       input_size=input_size,
+                                       thetas_dims=(32, 32),
+                                       device=device,
+                                       classes=self.classes,
+                                       hidden_layer_units=self.hidden_size,
+                                       input_features_size=input_features_size_a1)
+
+        self.nbeats_alpha2 = NBeatsNet(stack_types=[NBeatsNet.GENERIC_BLOCK],
+                                       nb_blocks_per_stack=self.num_layers,
+                                       target_size=num_classes,
+                                       input_size=input_size,
+                                       thetas_dims=(32, 32),
+                                       device=device,
+                                       classes=self.classes,
+                                       hidden_layer_units=hidden_size,
+                                       input_features_size=input_features_size_a2)
+
+        self.fc_1 = nn.Linear(self.input_size * (input_features_size_a1 + input_features_size_a2), 128)  # hidden_size, 128)  # fully connected 1
+        self.fc = nn.Linear(128, num_classes)  # fully connected last layer
+
+    def forward(self, alpha1_input, alpha2_input):
+        _, output_alpha1 = self.nbeats_alpha1(alpha1_input)  # lstm with input, hidden, and internal state
+        _, output_alpha2 = self.nbeats_alpha2(alpha2_input)  # lstm with input, hidden, and internal state
+        logger.debug(f"ALPHA 1 Output Shape: {output_alpha1.shape}\nALPHA 2 Output shape: {output_alpha2.shape}")
+
+        tmp = torch.hstack((output_alpha1, output_alpha2))
+        tmp = torch.flatten(tmp, start_dim=1)
+
+        out = self.fc_1(tmp)  # first Dense
+        out = self.relu(out)  # relu
+        out = self.fc(out)  # Final Output
+        return out
 
 class CustomLSTMPeephole_ALPHA(nn.Module):
     def __init__(self,

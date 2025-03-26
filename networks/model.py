@@ -48,7 +48,6 @@ class NBeatsNet(nn.Module):
             self.linea_multiplier = input_size
             if input_size > 6:
                 self.linea_multiplier = 6
-            linear_input_size = input_size * self.linea_multiplier + input_features_size * self.linea_multiplier + self.linea_multiplier
         self.fc_linear = nn.Linear(input_features_size * len(classes), len(classes))
 
         print(f'| N-Beats, device={self.device}')
@@ -62,12 +61,10 @@ class NBeatsNet(nn.Module):
         print(f'| --  Stack {stack_type.title()} (#{stack_id}) (share_weights_in_stack={self.share_weights_in_stack})')
         blocks = []
         for block_id in range(self.nb_blocks_per_stack):
-            block_init = NBeatsNet.select_block(stack_type)
             if self.share_weights_in_stack and block_id != 0:
                 block = blocks[-1]  # pick up the last one when we share weights.
             else:
-                block = block_init(self.hidden_layer_units, self.thetas_dim[stack_id], self.input_features_size * self.input_size,
-                                   self.target_size, classes=len(self.classes))
+                block = GenericBlock(self.hidden_layer_units, self.thetas_dim[stack_id], self.input_size, self.target_size, classes=len(self.classes))
                 self.parameters.extend(block.parameters())
             print(f'     | -- {block}')
             blocks.append(block)
@@ -156,65 +153,6 @@ class GenericBlock(Block):
         return backcast, forecast
 
 
-class Nbeats_alpha(nn.Module):
-    def __init__(self,
-                 input_size,
-                 num_classes,
-                 hidden_size,
-                 num_layers,
-                 seq_length,
-                 device,
-                 classes=[],
-                 model_type='alpha',
-                 input_features_size_a1=350,
-                 input_features_size_a2=185):
-        super(Nbeats_alpha, self).__init__()
-
-        self.num_classes = num_classes  # number of classes
-        self.num_layers = num_layers  # number of layers
-        self.input_size = input_size  # input size
-        self.hidden_size = hidden_size  # hidden state
-        self.seq_length = seq_length  # sequence length
-        self.model_type = model_type
-        self.device=device
-        self.classes = classes
-        self.relu = nn.ReLU()
-
-        self.nbeats_alpha1 = NBeatsNet(stack_types=[NBeatsNet.GENERIC_BLOCK],
-                                       nb_blocks_per_stack=self.num_layers,
-                                       target_size=num_classes,
-                                       input_size=input_size,
-                                       thetas_dims=(32, 32),
-                                       device=device,
-                                       classes=self.classes,
-                                       hidden_layer_units=self.hidden_size,
-                                       input_features_size=input_features_size_a1)
-
-        self.nbeats_alpha2 = NBeatsNet(stack_types=[NBeatsNet.GENERIC_BLOCK],
-                                       nb_blocks_per_stack=self.num_layers,
-                                       target_size=num_classes,
-                                       input_size=input_size,
-                                       thetas_dims=(32, 32),
-                                       device=device,
-                                       classes=self.classes,
-                                       hidden_layer_units=hidden_size,
-                                       input_features_size=input_features_size_a2)
-
-        self.fc_1 = nn.Linear(self.input_size * (input_features_size_a1 + input_features_size_a2), 128)  # hidden_size, 128)  # fully connected 1
-        self.fc = nn.Linear(128, num_classes)  # fully connected last layer
-
-    def forward(self, alpha1_input, alpha2_input):
-        _, output_alpha1 = self.nbeats_alpha1(alpha1_input)  # lstm with input, hidden, and internal state
-        _, output_alpha2 = self.nbeats_alpha2(alpha2_input)  # lstm with input, hidden, and internal state
-        logger.debug(f"ALPHA 1 Output Shape: {output_alpha1.shape}\nALPHA 2 Output shape: {output_alpha2.shape}")
-
-        tmp = torch.hstack((output_alpha1, output_alpha2))
-        tmp = torch.flatten(tmp, start_dim=1)
-
-        out = self.fc_1(tmp)  # first Dense
-        out = self.relu(out)  # relu
-        out = self.fc(out)  # Final Output
-        return out
 
 
 class Nbeats_beta(nn.Module):
@@ -266,12 +204,13 @@ class Nbeats_beta(nn.Module):
 
     def forward(self, beta_input):
         logger.debug(f"NBeats_beta INPUT shape: {beta_input.shape}")
-        beta_flattened = torch.flatten(beta_input, start_dim=1)
-        logger.debug(f"NBeats_beta INPUT FLATTENED shape: {beta_flattened.shape}")
-        _, output_beta = self.nbeats_beta(beta_flattened)  # lstm with input, hidden, and internal state
-        output_beta = self.dropoutNBEATS(output_beta)
+        #beta_flattened = torch.flatten(beta_input, start_dim=1)
+        #logger.debug(f"NBeats_beta INPUT FLATTENED shape: {beta_flattened.shape}")
+        _, output_beta = self.nbeats_beta(beta_input)  # lstm with input, hidden, and internal state
         logger.debug(f"Nbeats_beta OUTPUT shape: {output_beta.shape}")
-        tmp = output_beta
+        output_beta = self.dropoutNBEATS(output_beta)
+        logger.debug(f"Nbeats_beta DROPOUT OUTPUT shape: {output_beta.shape}")
+        tmp = torch.flatten(output_beta, start_dim=1)
         out = self.relu(tmp)  # relu
         out = self.fc(out)  # Final Output
         out = self.dropoutFC(out)
@@ -363,7 +302,9 @@ class LSTM_ECG(nn.Module):
                             device=self.device))  # internal state
 
             output_beta, (hn_beta, cn) = self.lstm_alpha1(alpha2_input, (h_0, c_0))
+            logger.debug(f"LSTM_beta OUTPUT shape: {output_beta.shape}")
             output_beta = self.dropoutLstmA(output_beta)
+            logger.debug(f"LSTM_beta DROPOUT OUTPUT shape: {output_beta.shape}")
             out = torch.flatten(output_beta, start_dim=1)
             out = self.relu(out)  # relu
             out = self.fc(out)  # Final Output
