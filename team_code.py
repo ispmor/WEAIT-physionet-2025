@@ -123,7 +123,7 @@ def train_model(data_folder, model_folder, verbose):
                 sami_trop_recordings.append(record)     
                 continue
             else:
-                if random.random() > 0.5:
+                if random.random() > 0.05:
                     continue
         
         header_files.append(os.path.join(data_folder, get_header_file(records[i])))
