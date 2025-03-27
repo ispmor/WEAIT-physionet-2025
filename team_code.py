@@ -191,6 +191,7 @@ def run_model(record, model, verbose):
     date = execution_time.date()
     time = execution_time.time()
     log_filename =f'logs/{name}/{date}/{time}-TEST.log'
+    os.makedirs(os.path.dirname(log_filename), exist_ok=True)
     logging_level = logging.INFO
     if debug_mode:
         logging_level = logging.DEBUG
