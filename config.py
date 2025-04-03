@@ -20,11 +20,11 @@ class ARGS():
         self.debug_mode = False
         self.remove_baseline = False
         self.fold_to_process = ""
-        self.network = "NBEATS"
+        self.network = "LSTM"
         self.include_domain = False
-        self.alpha_hidden=11
+        self.alpha_hidden=7
         self.alpha_layers=2
-        self.beta_hidden=11
+        self.beta_hidden=7
         self.beta_layers=2
         self.epochs=30
         self.early_stop=15
