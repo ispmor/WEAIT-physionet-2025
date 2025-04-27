@@ -192,6 +192,15 @@ class UtilityFunctions:
                     logger.warning(e, exc_info=True)
                     logger.warning(f"Comming from: \n{header}")
                     was_logged=True
+                    
+            points = {}
+            for point in ['ECG_P_Peaks', 'ECG_Q_Peaks', 'ECG_R_Peaks', 'ECG_S_Peaks', 'ECG_T_Peaks']:
+                if info[point] is not None:
+                    indices = info[point].dropna().astype(int).values
+                    values = signal[indices]  # Original signal, not cleaned
+                    points[point] = values
+                else:
+                    points[point] = np.array([])
 
             signals[lead_name] = signal
             infos[lead_name] = info
