@@ -4,12 +4,16 @@ import shutil
 import os
 from pathlib import Path
 
+print(os.path.abspath(os.getcwd()))
+print(os.path.dirname(os.path.abspath(__file__)))
 
-data_folder = "data/micro_code_sami/"
-test_data_folder = "data/test_files/"
+data_folder = "/home/bartek/PHYSIONET-2025/training_data/all_files"
+test_data_folder = "/home/bartek/PHYSIONET-2025/test_files/"
 print('Finding the Challenge data...')
 records = find_records(data_folder)
 num_records = len(records)
+print(num_records)
+
 
 sami_total = []
 code_15_positive = []

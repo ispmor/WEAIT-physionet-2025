@@ -21,7 +21,9 @@ probability_string = '# Chagas probability:'
 # Find the records in a folder and its subfolders.
 def find_records(folder, header_extension='.hea'):
     records = set()
+    print(folder)
     for root, directories, files in os.walk(folder):
+        print(root)
         for file in files:
             extension = os.path.splitext(file)[1]
             if extension == header_extension:

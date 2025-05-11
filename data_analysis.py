@@ -10,7 +10,7 @@ from sklearn.preprocessing import StandardScaler
 
 pd.options.display.max_rows = 999
 
-data_folder = "data/micro_code_sami/"
+data_folder = "/home/bartek/PHYSIONET-2025/data"
 print('Finding the Challenge data...')
 records = find_records(data_folder)
 num_records = len(records)
@@ -20,7 +20,7 @@ if num_records == 0:
 
 utilObject = UtilityFunctions("cpu")
 sampling_rate = 400
-leads_idxs = {'I': 0, 'II': 1, 'III':2, 'aVR': 3, 'aVL':4, 'aVF':5, 'V1':6, 'V2':7, 'V3':8, 'V4':9, 'V5':10, 'V6':11}
+leads_idxs = {'I': 0}#, 'II': 1, 'III':2, 'aVR': 3, 'aVL':4, 'aVF':5, 'V1':6, 'V2':7, 'V3':8, 'V4':9, 'V5':10, 'V6':11}
 
 code15_peaks_values_negative = []
 code15_peaks_values_positive = []
