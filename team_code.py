@@ -129,7 +129,6 @@ def train_model(data_folder, model_folder, verbose):
         header_files.append(os.path.join(data_folder, get_header_file(records[i])))
         record_files.append(record)
         
-
     totalX = list(zip(record_files, header_files))
     totalSami = list(zip(sami_trop_recordings, sami_trop_headers))
 
@@ -262,3 +261,58 @@ def run_model(record, model, verbose):
 # Optional functions. You can change or remove these functions and/or add new functions.
 #
 ################################################################################
+
+# Extract your features.
+def extract_features(record):
+    header = load_header(record)
+
+    # Extract the age from the record.
+    age = get_age(header)
+    age = np.array([age])
+
+    # Extract the sex from the record and represent it as a one-hot encoded vector.
+    sex = get_sex(header)
+    sex_one_hot_encoding = np.zeros(3, dtype=bool)
+    if sex.casefold().startswith('f'):
+        sex_one_hot_encoding[0] = 1
+    elif sex.casefold().startswith('m'):
+        sex_one_hot_encoding[1] = 1
+    else:
+        sex_one_hot_encoding[2] = 1
+
+    # Extract the source from the record (but do not use it as a feature).
+    source = get_source(header)
+
+    # Load the signal data and fields. Try fields.keys() to see the fields, e.g., fields['fs'] is the sampling frequency.
+    signal, fields = load_signals(record)
+    channels = fields['sig_name']
+
+    # Reorder the channels in case they are in a different order in the signal data.
+    reference_channels = ['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
+    num_channels = len(reference_channels)
+    signal = reorder_signal(signal, channels, reference_channels)
+
+    # Compute two per-channel features as examples.
+    signal_mean = np.zeros(num_channels)
+    signal_std = np.zeros(num_channels)
+
+    for i in range(num_channels):
+        num_finite_samples = np.sum(np.isfinite(signal[:, i]))
+        if num_finite_samples > 0:
+            signal_mean[i] = np.nanmean(signal)
+        else:
+            signal_mean = 0.0
+        if num_finite_samples > 1:
+            signal_std[i] = np.nanstd(signal)
+        else:
+            signal_std = 0.0
+
+    # Return the features.
+
+    return age, sex_one_hot_encoding, source, signal_mean, signal_std
+
+# Save your trained model.
+def save_model(model_folder, model):
+    d = {'model': model}
+    filename = os.path.join(model_folder, 'model.sav')
+    joblib.dump(d, filename, protocol=0)
