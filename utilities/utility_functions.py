@@ -283,7 +283,7 @@ class UtilityFunctions:
                         dataset_label = np.array([1,0,0])
                         
                     elif "SaMi-Trop" in source_info[0]:
-                        weight_multiplier = 30
+                        weight_multiplier = 100
                         dataset_label = np.array([0,1,0])
                     
 
