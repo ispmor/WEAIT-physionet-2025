@@ -74,7 +74,7 @@ def train_model(data_folder, model_folder, verbose):
     date = execution_time.date()
     time = execution_time.time()
     log_filename =f'logs/{name}/{date}/{time}.log'
-    tensorboardWriter: SummaryWriter = SummaryWriter(f"runs/physionet-2025")
+    tensorboardWriter: SummaryWriter = SummaryWriter(f"runs/physionet-2025_{date}_{time}")
     os.makedirs(os.path.dirname(log_filename), exist_ok=True)
     logging_level = logging.INFO
     if debug_mode:
