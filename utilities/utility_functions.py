@@ -310,10 +310,10 @@ class UtilityFunctions:
                 continue
             recording_raw, recording_drift_removed, rr_features, wavelet_features = self.one_file_training_data(recording, drift_removed_recording, signals, infos, rates, self.window_size,peaks, header_file, leads=leads)
 
-            #recording_raw = np.repeat(recording_raw, weight_multiplier, axis=0)
-            #recording_drift_removed = np.repeat(recording_drift_removed, weight_multiplier, axis=0)
-            #rr_features = np.repeat(rr_features, weight_multiplier, axis=0)
-            #wavelet_features = np.repeat(wavelet_features, weight_multiplier, axis=0)
+            recording_raw = np.repeat(recording_raw, weight_multiplier, axis=0)
+            recording_drift_removed = np.repeat(recording_drift_removed, weight_multiplier, axis=0)
+            rr_features = np.repeat(rr_features, weight_multiplier, axis=0)
+            wavelet_features = np.repeat(wavelet_features, weight_multiplier, axis=0)
             
             new_windows = recording_raw.shape[0]
             dataset_label = np.array(dataset_label * new_windows)
@@ -321,11 +321,11 @@ class UtilityFunctions:
             if new_windows == 0:
                 logger.debug("New windows is 0! SKIPPING")
                 continue
-            all_signals_entries += (new_windows * weight_multiplier)
+            all_signals_entries += new_windows #(new_windows * weight_multiplier)
             label_pack = None
             if current_label:
                 label_pack = np.ones((new_windows, 1), dtype=np.bool_)
-                pos_signals += (new_windows * weight_multiplier)
+                pos_signals += new_windows #(new_windows * weight_multiplier)
             else:
                 label_pack = np.zeros((new_windows, 1), dtype=np.bool_)
             dset.resize(dset.shape[0] + new_windows, axis=0)
