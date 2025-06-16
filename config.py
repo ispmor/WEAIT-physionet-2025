@@ -16,7 +16,6 @@ class ARGS():
         self.delta_input_size=256
         self.epsilon_input_size=1500
         self.zeta_input_size=1500
-        self.name = f"Physionet_RUN_{datetime.today().strftime('%Y-%m-%d')}"
         self.debug_mode = False
         self.remove_baseline = False
         self.fold_to_process = ""
@@ -30,6 +29,6 @@ class ARGS():
         self.early_stop=15
         self.fold = 1
         self.leads = "12"
-
+        self.name = f"{self.network}_{self.leads}_{datetime.today().strftime('%Y-%m-%d')}"
 
 
