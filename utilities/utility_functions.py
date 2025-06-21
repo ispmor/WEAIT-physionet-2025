@@ -3,7 +3,7 @@ import h5py
 import neurokit2 as nk
 from networks.model import  get_MultibranchBeats
 from pywt import wavedec
-from helper_code import get_label, load_header, load_signals
+from helper_code import *
 from .pan_tompkins_detector import *
 from .results_handling import *
 from .data_preprocessing import *
@@ -71,11 +71,6 @@ class UtilityFunctions:
 
 
 
-    def add_classes_counts(self, new_counts):
-        logger.debug(f"Adding the following classes count: {new_counts}")
-        for k, v in new_counts.items():
-            self.classes_counts[k] += v
-
 
     def prepare_h5_dataset(self, leads, single_fold_data_training, single_fold_data_test):
         print(f"Preparing HDF5 dataset from WFDB files")
@@ -88,8 +83,8 @@ class UtilityFunctions:
 
         if not os.path.isfile(training_filename):
             print(f"{training_filename} not found, creating database")
-            positive_class_count, all_signals_count = self.create_hdf5_db(training_data_length, single_fold_data_training,  leads, isTraining=1, filename=training_filename)
-            np.savetxt(self.training_weights_filename, np.asarray(np.vstack([positive_class_count, all_signals_count])), delimiter=',')
+            positive_class_count, negative_class_count = self.create_hdf5_db(training_data_length, single_fold_data_training,  leads, isTraining=1, filename=training_filename)
+            np.savetxt(self.training_weights_filename, np.asarray(np.vstack([positive_class_count, negative_class_count])), delimiter=',')
 
 
 
@@ -173,7 +168,7 @@ class UtilityFunctions:
 
     def preprocess_recording(self, recording, header, leads_idxs, denoise_wavelet="db6", deniose_level=3, peaks_method="pantompkins1985", sampling_rate=400):
         if recording is None:
-            return (None, None, None, None, None, None, None)
+            return (None, None, None, None, None, None)
         drift_removed_recording, _ = remove_baseline_drift(recording)
         signals = {}
         infos = {}
@@ -229,6 +224,55 @@ class UtilityFunctions:
 
         return recording
 
+    def extract_features(self, record: str):
+        header = load_header(record)
+
+        # Extract the age from the record.
+        age = get_age(header)
+        age = np.array([age])
+
+        # Extract the sex from the record and represent it as a one-hot encoded vector.
+        sex = get_sex(header)
+        sex_one_hot_encoding = np.zeros(3, dtype=bool)
+        if sex.casefold().startswith('f'):
+            sex_one_hot_encoding[0] = 1
+        elif sex.casefold().startswith('m'):
+            sex_one_hot_encoding[1] = 1
+        else:
+            sex_one_hot_encoding[2] = 1
+
+        # Extract the source from the record (but do not use it as a feature).
+        source = get_source(header)
+
+        # Load the signal data and fields. Try fields.keys() to see the fields, e.g., fields['fs'] is the sampling frequency.
+        signal, fields = load_signals(record)
+        channels = fields['sig_name']
+
+        # Reorder the channels in case they are in a different order in the signal data.
+        reference_channels = ['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
+        num_channels = len(reference_channels)
+        signal = reorder_signal(signal, channels, reference_channels)
+
+        # Compute two per-channel features as examples.
+        signal_mean = np.zeros(num_channels)
+        signal_std = np.zeros(num_channels)
+
+        for i in range(num_channels):
+            num_finite_samples = np.sum(np.isfinite(signal[:, i]))
+            if num_finite_samples > 0:
+                signal_mean[i] = np.nanmean(signal)
+            else:
+                signal_mean = 0.0
+            if num_finite_samples > 1:
+                signal_std[i] = np.nanstd(signal)
+            else:
+                signal_std = 0.0 
+                #TODO this is a potentail bug when it comes to dimensions
+
+        # Return the features.
+
+        return age, sex_one_hot_encoding, source, signal_mean, signal_std, signal, fields
+
 
 
 
@@ -245,13 +289,13 @@ class UtilityFunctions:
 
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         pos_signals = 1
-        all_signals_entries = 1
+        neg_signals = 1
 
         h5file = h5py.File(filename, 'w')
         grp = h5file.create_group(group)
         dset = grp.create_dataset("data", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size), dtype='f', chunks=(1, len(leads), self.window_size))
         lset = grp.create_dataset("label", (1,1), maxshape=(None, 1), dtype='f', chunks=(1, 1))
-        dataset = grp.create_dataset("dataset", (1,3), maxshape=(None, 3), dtype='f', chunks=(1, 3))
+        recording_features = grp.create_dataset("recording_features", (1,28), maxshape=(None, 28), dtype='f', chunks=(1, 28))
         rrset = grp.create_dataset("rr_features", (1, len(leads), self.rr_features_size), maxshape=(None, len(leads), self.rr_features_size), dtype='f', chunks=True)
         waveset = grp.create_dataset("wavelet_features", (1, len(leads), self.wavelet_features_size), maxshape=(None, len(leads), self.wavelet_features_size), dtype='f', chunks=(1, len(leads), self.wavelet_features_size))
         nodriftset = grp.create_dataset("drift_removed", (1, len(leads), self.window_size), maxshape=(None, len(leads), self.window_size),dtype='f',chunks=(1, len(leads), self.window_size))
@@ -259,6 +303,7 @@ class UtilityFunctions:
         for recording_file, header_file in data:
         
             print(f"Iterating over {i +1} out of {num_recordings} files - {header_file}")
+            # extract features of the recording, source will be ignored as it may be a redherring
             # Load header and recording.
             header = load_header(header_file)
             try:
@@ -268,23 +313,19 @@ class UtilityFunctions:
                 current_label = 0
 
             try:
-                signal, fields = load_signals(recording_file)
+                 age, sex_one_hot_encoding, source, signal_mean, signal_std, signal, fields = self.extract_features(recording_file)
             except Exception as e:
                 print(f"Skipping {header_file} and associated recording  because of {e}")
                 continue
 
+            recording_features_record = np.concatenate((age, sex_one_hot_encoding, signal_mean, signal_std))
+            print(recording_features_record.shape)
+
             weight_multiplier = 1
-            dataset_label = np.array([0,0,1]) #We have 3 labels known now - CODE, SAMI-TROP and Unknown, default is unknown
-            if "comments" in fields:
-                source_info = [x for x in fields["comments"] if "Source" in x]
-                if len(source_info) > 0:
-                    if "CODE" in source_info[0]:
-                        weight_multiplier = 1
-                        dataset_label = np.array([1,0,0])
-                        
-                    elif "SaMi-Trop" in source_info[0]:
-                        weight_multiplier = 30
-                        dataset_label = np.array([0,1,0])
+            if source is None:
+                source = ""
+            #if "sami" not in source.lower():
+            #    weight_multiplier = 100
                     
 
 
@@ -310,30 +351,30 @@ class UtilityFunctions:
                 continue
             recording_raw, recording_drift_removed, rr_features, wavelet_features = self.one_file_training_data(recording, drift_removed_recording, signals, infos, rates, self.window_size,peaks, header_file, leads=leads)
 
-            recording_raw = np.repeat(recording_raw, weight_multiplier, axis=0)
-            recording_drift_removed = np.repeat(recording_drift_removed, weight_multiplier, axis=0)
-            rr_features = np.repeat(rr_features, weight_multiplier, axis=0)
-            wavelet_features = np.repeat(wavelet_features, weight_multiplier, axis=0)
+            #recording_raw = np.repeat(recording_raw, weight_multiplier, axis=0)
+            #recording_drift_removed = np.repeat(recording_drift_removed, weight_multiplier, axis=0)
+            #rr_features = np.repeat(rr_features, weight_multiplier, axis=0)
+            #wavelet_features = np.repeat(wavelet_features, weight_multiplier, axis=0)
             
             new_windows = recording_raw.shape[0]
-            dataset_label = np.array(dataset_label * new_windows)
+            recording_features_repeated = np.repeat([recording_features_record], new_windows, axis=0)
             
             if new_windows == 0:
                 logger.debug("New windows is 0! SKIPPING")
                 continue
-            all_signals_entries += new_windows #(new_windows * weight_multiplier)
             label_pack = None
             if current_label:
                 label_pack = np.ones((new_windows, 1), dtype=np.bool_)
-                pos_signals += new_windows #(new_windows * weight_multiplier)
+                pos_signals += new_windows # * weight_multiplier)
             else:
+                neg_signals += new_windows * weight_multiplier
                 label_pack = np.zeros((new_windows, 1), dtype=np.bool_)
             dset.resize(dset.shape[0] + new_windows, axis=0)
             dset[-new_windows:] = recording_raw
             lset.resize(lset.shape[0] + new_windows, axis=0)
             lset[-new_windows:] = label_pack
-            dataset.resize(dataset.shape[0] + new_windows, axis=0)
-            dataset[-new_windows:] = dataset_label
+            recording_features.resize(recording_features.shape[0] + new_windows, axis=0)
+            recording_features[-new_windows:] = recording_features_repeated
             rrset.resize(rrset.shape[0] + new_windows, axis=0)
             rrset[-new_windows:] = rr_features
             waveset.resize(waveset.shape[0] + new_windows, axis=0)
@@ -344,10 +385,10 @@ class UtilityFunctions:
             nodriftset.resize(nodriftset.shape[0] + new_windows, axis=0)
             nodriftset[-new_windows:] = recording_drift_removed
             print(f"Positive class counter after file: {pos_signals}")
-            print(f"Total class counter after file: {all_signals_entries}")
+            print(f"Negative class counter after file: {neg_signals}")
             i += 1
         print(f'Successfully created {group} dataset {filename}')
-        return pos_signals, all_signals_entries
+        return pos_signals, neg_signals
 
 
     def load_training_weights(self):
@@ -359,9 +400,9 @@ class UtilityFunctions:
             logger.debug(f"Loaded weights from CSV Reader: {data}")
         weights=torch.from_numpy(np.array(data, dtype=np.float32)).to(self.device)
         pos_weights = weights[0]
-        total_weights = weights[1]
+        neg_weights = weights[1]
 
-        final_weight = total_weights/pos_weights
+        final_weight = neg_weights/pos_weights
         return final_weight
 
     def load_test_headers_and_recordings(self, fold, leads):

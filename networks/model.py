@@ -314,27 +314,6 @@ class LSTM_ECG(nn.Module):
 
 
 
-class BlendMLP(nn.Module):
-    def __init__(self, modelA, modelB, classes):
-        super(BlendMLP, self).__init__()
-        self.modelA = modelA
-        self.modelB = modelB
-        self.classes = classes
-        self.linear = nn.Linear(2 * len(classes) + 20, len(classes))
-
-    def forward(self, alpha1_input, alpha2_input, beta_input, rr):
-        x1 = self.modelA(alpha1_input, alpha2_input)
-        x2 = self.modelB(beta_input)
-
-        if x1.shape == x2.shape:
-            out = F.relu(torch.cat((x1, x2), dim=1))
-            out_with_rr = torch.cat((out, rr), dim=1)
-            out = self.linear(out_with_rr)
-            return out
-        else:
-            return x1
-        return x2
-
 class MultibranchBeats(nn.Module):
     def __init__(self, modelA, modelB, modelC, modelD, modelE, classes):
         super(MultibranchBeats, self).__init__()
@@ -343,22 +322,24 @@ class MultibranchBeats(nn.Module):
         self.modelC = modelC
         self.modelD = modelD
         self.modelE = modelE
+        self.modelF = nn.Linear(28, len(classes))
         self.classes = classes
-        self.linear = nn.Linear( 5 * len(classes) + 3, len(classes)) #+3 in order to add one-hot-encoded dataset label
+        self.linear = nn.Linear( 6 * len(classes), len(classes)) 
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, alpha_input, beta_input, gamma_input, delta_input, epsilon_input, dataset_label):
+    def forward(self, alpha_input, beta_input, gamma_input, delta_input, epsilon_input, recording_features):
         logger.debug(f"Alpha input shape: {alpha_input.shape}\nBeta input shape: {beta_input.shape}\nGamma input shape: {gamma_input.shape}\nDelta input shape: {delta_input.shape}")
-        logger.debug(f"Dataset label: {dataset_label.shape}")
+        logger.debug(f"Dataset label: {recording_features.shape}")
 
         outA = self.modelA(alpha_input)
         outB = self.modelB(beta_input)
         outC = self.modelC(gamma_input)
         outD = self.modelD(delta_input)
         outE = self.modelE(epsilon_input)
-        logger.debug(f"Alpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}, Epsilon output shape: {outE.shape}, dataset label shape: {dataset_label.shape}")
+        outF = self.modelF(recording_features)
+        logger.debug(f"Alpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}, Epsilon output shape: {outE.shape}, dataset label shape: {recording_features.shape}")
 
-        out_concat = F.relu(torch.cat((outA, outB, outC, outD, outE, dataset_label), dim=1))
+        out_concat = F.relu(torch.cat((outA, outB, outC, outD, outE, outF), dim=1))
         out = self.linear(out_concat)
         return out
 
@@ -430,13 +411,6 @@ class BranchConfig:
         self.beta_input_size=beta_input_size
         self.channels = channels
 
-
-
-def get_BlendMLP(alpha_config: BranchConfig, beta_config: BranchConfig, classes: list, device, leads: list) -> BlendMLP:
-    alpha_branch = get_single_network(alpha_config.network_name, alpha_config.hidden_size, alpha_config.layers, leads, classes, alpha_config.single_peak_length, alpha_config.a1_input_size, alpha_config.a2_input_size, None, "alpha", device)
-    beta_branch = get_single_network(beta_config.network_name, beta_config.hidden_size, beta_config.layers, leads, classes, beta_config.single_peak_length, None, None, beta_config.beta_input_size, "beta", device)
-
-    return BlendMLP(alpha_branch, beta_branch, classes)
 
 
 

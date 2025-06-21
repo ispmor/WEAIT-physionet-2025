@@ -115,7 +115,7 @@ def domain_at_mlp(batch):
 
 
 def multibranch_division(batch):
-    x_raw, x_drift_removed,  y, rr_features, wavelet_features, dataset_label = batch
+    x_raw, x_drift_removed,  y, rr_features, wavelet_features, recording_features = batch
     x_raw = torch.transpose(x_raw, 1, 2)
     x_drift_removed = torch.transpose(x_drift_removed, 1, 2)
     rr_features = torch.transpose(rr_features, 1, 2)
@@ -135,4 +135,4 @@ def multibranch_division(batch):
 
     logger.debug(f"Shape nf alpha_input: {alpha_input.shape}\nShape of beta_input: {beta_input.shape}\nGamma shape: {gamma_input.shape}\nDelta input shape: {delta_input.shape}\nEpsilon input shape: {epsilon_input.shape}")
 
-    return alpha_input, beta_input, gamma_input, delta_input, epsilon_input,dataset_label,  y
+    return alpha_input, beta_input, gamma_input, delta_input, epsilon_input,recording_features,  y
