@@ -319,7 +319,6 @@ class UtilityFunctions:
                 continue
 
             recording_features_record = np.concatenate((age, sex_one_hot_encoding, signal_mean, signal_std))
-            print(recording_features_record.shape)
 
             weight_multiplier = 1
             if source is None:
@@ -384,8 +383,6 @@ class UtilityFunctions:
                 waveset[-new_windows:] = wavelet_features
             nodriftset.resize(nodriftset.shape[0] + new_windows, axis=0)
             nodriftset[-new_windows:] = recording_drift_removed
-            print(f"Positive class counter after file: {pos_signals}")
-            print(f"Negative class counter after file: {neg_signals}")
             i += 1
         print(f'Successfully created {group} dataset {filename}')
         return pos_signals, neg_signals
