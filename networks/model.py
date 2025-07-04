@@ -324,7 +324,7 @@ class MultibranchBeats(nn.Module):
         self.modelE = modelE
         self.modelF = nn.Linear(28, len(classes))
         self.classes = classes
-        self.linear = nn.Linear( 2 * len(classes), len(classes)) 
+        self.linear = nn.Linear( 1 * len(classes), len(classes)) 
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, alpha_input, beta_input, gamma_input, delta_input, epsilon_input, recording_features):
@@ -336,11 +336,12 @@ class MultibranchBeats(nn.Module):
         #outC = self.modelC(gamma_input)
         #outD = self.modelD(delta_input)
         #outE = self.modelE(epsilon_input)
-        outF = self.modelF(recording_features)
+        #outF = self.modelF(recording_features)
         #logger.debug(f"Alpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}, Epsilon output shape: {outE.shape}, dataset label shape: {recording_features.shape}")
 
-        out_concat = F.relu(torch.cat(( outB, outF), dim=1))
-        out = self.linear(out_concat)
+        #out_concat = F.relu(torch.cat(( outB, outF), dim=1))
+        #out = self.linear(out_concat)
+        out = self.linear(outB)
         return out
 
 
