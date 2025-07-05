@@ -12,8 +12,8 @@ class ARGS():
         self.wavelet_features_size=759
         self.alpha_input_size=1500
         self.beta_input_size=759
-        self.gamma_input_size=10668
-        self.delta_input_size=256
+        self.gamma_input_size=256
+        self.delta_input_size=10668
         self.epsilon_input_size=1500
         self.zeta_input_size=1500
         self.debug_mode = False
