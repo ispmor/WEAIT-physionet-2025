@@ -86,7 +86,7 @@ def train_model(data_folder, model_folder, verbose):
                       datefmt='%Y-%m-%d %H:%M:%S')
     logger.info(f"!!! Experiment: {name} !!!")
 
-    utilityFunctions = UtilityFunctions(device, datasets_dir=datasets_target_dir, rr_features_size=delta_input_size, window_size=window_size, wavelet_features_size=wavelet_features_size)
+    utilityFunctions = UtilityFunctions(device, datasets_dir=datasets_target_dir, rr_features_size=gamma_input_size, window_size=window_size, wavelet_features_size=wavelet_features_size)
 
     # Find the data files.
     if verbose:
@@ -204,7 +204,7 @@ def run_model(record, model, verbose):
                       datefmt='%Y-%m-%d %H:%M:%S')
     logger.info(f"!!! Experiment: {name} !!!")
 
-    utilityFunctions = UtilityFunctions(device, rr_features_size=delta_input_size, window_size=window_size, wavelet_features_size=wavelet_features_size)
+    utilityFunctions = UtilityFunctions(device, rr_features_size=gamma_input_size, window_size=window_size, wavelet_features_size=wavelet_features_size)
     # Extract the features.
     header = load_header(record)
     header_file = record + ".hea"
@@ -229,6 +229,7 @@ def run_model(record, model, verbose):
 
 
     recording_raw, recording_drift_removed, rr_features, wavelet_features= utilityFunctions.one_file_training_data(recording, drift_removed_recording, signals, infos, rates, utilityFunctions.window_size, peaks, header, leads)
+    logger.info(f"RAW: {recording_raw.shape}, DRIFT: {recording_drift_removed.shape}, DOMAIN: {rr_features.shape}, Wavelets: {wavelet_features.shape}")
 
     recording_features = torch.Tensor(np.array([recording_features_record] * recording_raw.shape[0])).to(device)
 
