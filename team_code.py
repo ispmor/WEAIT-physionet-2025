@@ -177,6 +177,7 @@ def train_model(data_folder, model_folder, verbose):
 # Load your trained models. This function is *required*. You should edit this function to add your code, but do *not* change the
 # arguments of this function. If you do not train one of the models, then you can return None for the model.
 def load_model(model_folder, verbose):
+    print(f"model path: {os.path.join(model_folder, 'best_model_physionet2025.th')}")
     checkpoint = torch.load(os.path.join(model_folder, "best_model_physionet2025.th"), map_location=torch.device(device))
     model = get_MultibranchBeats(alpha_config, beta_config, gamma_config,
                                  delta_config, epsilon_config, 
