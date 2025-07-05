@@ -25,8 +25,8 @@ def multibranch_division(batch):
 
     alpha_input = x_raw
     beta_input = wavelet_features
-    gamma_input = pca_features
-    delta_input = rr_features
+    gamma_input = rr_features
+    delta_input = pca_features
     epsilon_input = x_drift_removed
 
     logger.debug(f"Shape nf alpha_input: {alpha_input.shape}\nShape of beta_input: {beta_input.shape}\nGamma shape: {gamma_input.shape}\nDelta input shape: {delta_input.shape}\nEpsilon input shape: {epsilon_input.shape}")
