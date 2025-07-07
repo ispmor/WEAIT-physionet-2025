@@ -5,6 +5,7 @@ from torch import nn
 from torch.nn import functional as F
 from torch import autograd
 import logging
+import math
 
 
 logger = logging.getLogger(__name__)
@@ -311,8 +312,76 @@ class LSTM_ECG(nn.Module):
             out = self.dropoutFC(out)
         return out
 
+class Conv1dECG(nn.Module):
+    #implemented based on https://www.cinc.org/archives/2021/pdf/CinC2021-352.pdf
+    def __init__(self, in_channels, num_filters, num_classes, input_size):
+        super().__init__()
+        logger.info(f"in_channels={in_channels}, num_filters={num_filters}, num_classes={num_classes}")
+        self.conv1left = nn.Conv1d(in_channels, num_filters , kernel_size=15, stride=1, padding=7)
+        self.conv1right = nn.Conv1d(in_channels, num_filters, kernel_size=1, stride=1, padding=0)
+        self.swish1 = nn.SiLU()
+        self.spatialDropout1 = nn.Dropout1d(p=0.2)
+        self.avg_pooling = nn.AvgPool1d(3, stride=2, padding=1)
+        
+        self.conv2left = nn.Conv1d(num_filters, num_filters * 2 , kernel_size=3, stride=1, padding=1)
+        self.conv2right = nn.Conv1d(num_filters, num_filters * 2, kernel_size=1, stride=1, padding=0)
+        self.swish2 = nn.SiLU()
+        self.spatialDropout2 = nn.Dropout1d(p=0.2)
+        
+        self.conv3left = nn.Conv1d(num_filters * 2, num_filters * 4, kernel_size=5, stride=1, padding=2)
+        self.conv3right = nn.Conv1d(num_filters * 2, num_filters * 4, kernel_size=1, stride=1, padding=0)
+        self.swish3 = nn.SiLU()
+        self.spatialDropout3 = nn.Dropout1d(p=0.2)
+        
+        self.conv4left = nn.Conv1d(num_filters * 4, num_filters * 8 , kernel_size=7, stride=1, padding=3)
+        self.conv4right = nn.Conv1d(num_filters * 4, num_filters * 8, kernel_size=1, stride=1, padding=0)
+        self.swish4 = nn.SiLU()
+        self.spatialDropout4 = nn.Dropout1d(p=0.2)
+            
+        self.fc = nn.Linear(math.ceil(input_size/16.0), num_classes)
+        self.swish5 = nn.SiLU()
 
+    def forward(self, x):
+        logger.debug(f"----------START-------------")
+        x_left = self.conv1left(x)
+        x_right = self.conv1right(x)
+        logger.debug(f"x_left shape: {x_left.shape}, x_right shape: {x_right.shape}")
+        x = self.swish1(x_left + x_right)
+        logger.debug(f"shape after swish1: {x.shape}")
+        x = self.spatialDropout1(x)
+        logger.debug(f"shape after dropou: {x.shape}")
+        x = self.avg_pooling(x)
+        logger.debug(f"shape after avg_pooling: {x.shape}")
+        
+        logger.debug(f"------------2---------------")
+        x = self.swish2(self.conv2left(x) + self.conv2right(x))
+        logger.debug(f"shape after swish1: {x.shape}")
+        x = self.spatialDropout2(x)
+        logger.debug(f"shape after dropou: {x.shape}")
+        x = self.avg_pooling(x)
+        logger.debug(f"shape after avg_pooling: {x.shape}")
+        
+        logger.debug(f"------------3---------------")
+        x = self.swish3(self.conv3left(x) + self.conv3right(x))
+        logger.debug(f"shape after swish1: {x.shape}")
+        x = self.spatialDropout3(x)
+        logger.debug(f"shape after dropou: {x.shape}")
+        x = self.avg_pooling(x)
+        logger.debug(f"shape after avg_pooling: {x.shape}")
 
+        logger.debug(f"------------4---------------")
+        x = self.swish4(self.conv4left(x) + self.conv4right(x))
+        logger.debug(f"shape after swish1: {x.shape}")
+        x = self.spatialDropout4(x)
+        logger.debug(f"shape after dropou: {x.shape}")
+        x = self.avg_pooling(x)
+        logger.debug(f"shape after avg_pooling: {x.shape}")
+
+        logger.debug(f"------------FC--------------")
+        x = self.fc(x)
+        logger.debug(f"shape after FC: {x.shape}")
+        logger.debug(f"----------RETURN-------------")
+        return self.swish5(x)
 
 class MultibranchBeats(nn.Module):
     def __init__(self, modelA, modelB, modelC, modelD, modelE, classes):
@@ -324,7 +393,7 @@ class MultibranchBeats(nn.Module):
         self.modelE = modelE
         self.modelF = nn.Linear(28, len(classes))
         self.classes = classes
-        self.linear = nn.Linear( 6 * len(classes), len(classes)) 
+        self.linear = nn.Linear(5 * 88 + 1,  1)#6 * len(classes), len(classes)) 
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, alpha_input, beta_input, gamma_input, delta_input, epsilon_input, recording_features):
@@ -337,8 +406,14 @@ class MultibranchBeats(nn.Module):
         outD = self.modelD(delta_input)
         outE = self.modelE(epsilon_input)
         outF = self.modelF(recording_features)
-        #logger.debug(f"Alpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}, Epsilon output shape: {outE.shape}, dataset label shape: {recording_features.shape}")
+        logger.debug(f"Alpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}, Epsilon output shape: {outE.shape}, Zeta shape: {outF.shape}")
 
+        outA = torch.squeeze(outA) 
+        outB = torch.squeeze(outB)
+        outC = torch.squeeze(outC)
+        outD = torch.squeeze(outD)
+        outE = torch.squeeze(outE)
+        logger.debug(f"-------- AFTER SQUEEZE ---- \nAlpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}\nEpsilon output shape: {outE.shape}\n Zeta shape: {outF.shape}")
 
         out_concat = F.relu(torch.cat((outA, outB, outC, outD, outE, outF), dim=1))
         out = self.linear(out_concat)
@@ -347,6 +422,15 @@ class MultibranchBeats(nn.Module):
 
 def get_single_network(network, hs, layers, leads, selected_classes, single_peak_length,a1_in, a2_in, b_in, as_branch, device):
     torch.manual_seed(17)
+
+    if network == "CNN":
+        return Conv1dECG(
+                in_channels=leads,
+                num_filters=hs,
+                num_classes=len(selected_classes),
+                input_size=b_in
+                )
+
 
     if network == "LSTM":
         if as_branch == "alpha":
@@ -416,11 +500,11 @@ class BranchConfig:
 
 
 def get_MultibranchBeats(alpha_config: BranchConfig, beta_config: BranchConfig, gamma_config: BranchConfig, delta_config: BranchConfig, epsilon_config: BranchConfig, classes: list, device, leads) -> MultibranchBeats:
-    alpha_branch = get_single_network(alpha_config.network_name, alpha_config.hidden_size, alpha_config.layers, len(leads), classes, alpha_config.single_peak_length, None, None, alpha_config.beta_input_size, "beta", device)
-    beta_branch = get_single_network(beta_config.network_name, beta_config.hidden_size, beta_config.layers, len(leads), classes, beta_config.single_peak_length, None, None, beta_config.beta_input_size, "beta", device)
-    gamma_branch = get_single_network(gamma_config.network_name, gamma_config.hidden_size, gamma_config.layers, len(leads), classes, gamma_config.single_peak_length, None, None, gamma_config.beta_input_size, "beta", device)
-    delta_branch = get_single_network(delta_config.network_name, delta_config.hidden_size, delta_config.layers, delta_config.channels, classes, delta_config.single_peak_length, None, None, delta_config.beta_input_size, "beta", device)
-    epsilon_branch = get_single_network(epsilon_config.network_name, epsilon_config.hidden_size, epsilon_config.layers, len(leads), classes, epsilon_config.single_peak_length, None, None, epsilon_config.beta_input_size, "beta", device)
+    alpha_branch = get_single_network(alpha_config.network_name, alpha_config.hidden_size, None, len(leads), classes, None, None, None, alpha_config.beta_input_size, None, device)
+    beta_branch = get_single_network(beta_config.network_name, beta_config.hidden_size, None, len(leads), classes, None, None, None, beta_config.beta_input_size, None, device)
+    gamma_branch = get_single_network(gamma_config.network_name, gamma_config.hidden_size, None, len(leads), classes, None, None, None, gamma_config.beta_input_size, None, device)
+    delta_branch = get_single_network(delta_config.network_name, delta_config.hidden_size, None, delta_config.channels, classes, None, None, None, delta_config.beta_input_size, None, device)
+    epsilon_branch = get_single_network(epsilon_config.network_name, epsilon_config.hidden_size, None, len(leads), classes, None, None, None, epsilon_config.beta_input_size, None, device)
 
     return MultibranchBeats(alpha_branch, beta_branch, gamma_branch, delta_branch, epsilon_branch, classes)
 

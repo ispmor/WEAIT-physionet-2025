@@ -16,10 +16,10 @@ class ARGS():
         self.delta_input_size=10668
         self.epsilon_input_size=1500
         self.zeta_input_size=1500
-        self.debug_mode = False
+        self.debug_mode = True
         self.remove_baseline = False
         self.fold_to_process = ""
-        self.network = "LSTM"
+        self.network = "CNN"
         self.include_domain = False
         self.alpha_hidden=11
         self.alpha_layers=2

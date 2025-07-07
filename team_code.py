@@ -158,9 +158,9 @@ def train_model(data_folder, model_folder, verbose):
     training_config = TrainingConfig(batch_size=500,
                                     n_epochs_stop=early_stop,
                                     num_epochs=epochs,
-                                    lr_rate=0.01,
+                                    lr_rate=0.001,
                                     criterion=BCEWithLogitsLoss(pos_weight=weights),
-                                    optimizer=torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.01),
+                                    optimizer=torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.001),
                                     device=device,
                                     model_repository=model_folder
                                     )
