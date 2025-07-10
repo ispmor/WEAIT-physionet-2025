@@ -339,6 +339,7 @@ class Conv1dECG(nn.Module):
         self.spatialDropout4 = nn.Dropout1d(p=0.2)
             
         self.fc = nn.Linear(math.ceil(input_size/16.0), num_classes)
+        self.fc2 = nn.Linear(num_filters * 8, num_classes)
         self.swish5 = nn.SiLU()
 
     def forward(self, x):
@@ -380,6 +381,8 @@ class Conv1dECG(nn.Module):
         logger.debug(f"------------FC--------------")
         x = self.fc(x)
         logger.debug(f"shape after FC: {x.shape}")
+        x = torch.squeeze(x, dim=2)
+
         logger.debug(f"----------RETURN-------------")
         return self.swish5(x)
 
@@ -393,7 +396,7 @@ class MultibranchBeats(nn.Module):
         self.modelE = modelE
         self.modelF = nn.Linear(28, len(classes))
         self.classes = classes
-        self.linear = nn.Linear(5 * 88 + 1,  1)#6 * len(classes), len(classes)) 
+        self.linear = nn.Linear(6,  1)#6 * len(classes), len(classes)) 
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, alpha_input, beta_input, gamma_input, delta_input, epsilon_input, recording_features):
@@ -408,12 +411,12 @@ class MultibranchBeats(nn.Module):
         outF = self.modelF(recording_features)
         logger.debug(f"Alpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}, Epsilon output shape: {outE.shape}, Zeta shape: {outF.shape}")
 
-        outA = torch.squeeze(outA, dim=2) 
-        outB = torch.squeeze(outB, dim=2)
-        outC = torch.squeeze(outC, dim=2)
-        outD = torch.squeeze(outD, dim=2)
-        outE = torch.squeeze(outE, dim=2)
-        logger.debug(f"-------- AFTER SQUEEZE ---- \nAlpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}\nEpsilon output shape: {outE.shape}\n Zeta shape: {outF.shape}")
+        #outA = torch.squeeze(outA, dim=2) 
+        #outB = torch.squeeze(outB, dim=2)
+        #outC = torch.squeeze(outC, dim=2)
+        #outD = torch.squeeze(outD, dim=2)
+        #outE = torch.squeeze(outE, dim=2)
+        #logger.debug(f"-------- AFTER SQUEEZE ---- \nAlpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}\nEpsilon output shape: {outE.shape}\n Zeta shape: {outF.shape}")
 
         out_concat = F.relu(torch.cat((outA, outB, outC, outD, outE, outF), dim=1))
         out = self.linear(out_concat)
