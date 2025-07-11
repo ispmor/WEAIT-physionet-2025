@@ -21,10 +21,10 @@ class ARGS():
         self.fold_to_process = ""
         self.network = "LSTM"
         self.include_domain = False
-        self.alpha_hidden=144
-        self.alpha_layers=2
-        self.beta_hidden=144
-        self.beta_layers=2
+        self.alpha_hidden=6
+        self.alpha_layers=24
+        self.beta_hidden=6
+        self.beta_layers=24
         self.epochs=30
         self.early_stop=6
         self.fold = 1
