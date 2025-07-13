@@ -413,7 +413,7 @@ class MultibranchBeats(nn.Module):
         outD = self.modelD(delta_input)
         outE = self.modelE(epsilon_input)
         outF = self.modelF(recording_features)
-        logger.debug(f"Alpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}, Epsilon output shape: {outE.shape}, Zeta shape: {outF.shape}")
+        #logger.debug(f"Alpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}, Epsilon output shape: {outE.shape}, Zeta shape: {outF.shape}")
 
         #outA = torch.squeeze(outA, dim=2) 
         #outB = torch.squeeze(outB, dim=2)
