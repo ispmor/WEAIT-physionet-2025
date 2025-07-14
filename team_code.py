@@ -147,11 +147,11 @@ def train_model(data_folder, model_folder, verbose):
 
     utilityFunctions.prepare_h5_dataset(leads,  train_X, test_X)
     del train_X, test_X
-    training_dataset = HDF5Dataset('./' + utilityFunctions.training_filename, recursive=False, load_data=False, data_cache_size=1, transform=None, leads=leads_idx)
+    training_dataset = HDF5Dataset('./' + utilityFunctions.training_filename, recursive=False, load_data=False, data_cache_size=4, transform=None, leads=leads_idx)
     logger.info("Loaded training dataset")
     weights = utilityFunctions.load_training_weights()
 
-    test_dataset = HDF5Dataset('./' + utilityFunctions.test_filename, recursive=False, load_data=False, data_cache_size=1, transform=None, leads=leads_idx)
+    test_dataset = HDF5Dataset('./' + utilityFunctions.test_filename, recursive=False, load_data=False, data_cache_size=4, transform=None, leads=leads_idx)
     logger.info("Loaded validation dataset")
 
     model = get_MultibranchBeats(alpha_config, beta_config, gamma_config, delta_config, epsilon_config, utilityFunctions.all_classes,device, leads=list(leads))
@@ -165,8 +165,8 @@ def train_model(data_folder, model_folder, verbose):
                                     model_repository=model_folder
                                     )
 
-    training_data_loader = torch_data.DataLoader(training_dataset, batch_size=100, shuffle=True, num_workers=1)
-    test_data_loader = torch_data.DataLoader(test_dataset, batch_size=100, shuffle=True, num_workers=1)
+    training_data_loader = torch_data.DataLoader(training_dataset, batch_size=100, shuffle=True, num_workers=6)
+    test_data_loader = torch_data.DataLoader(test_dataset, batch_size=100, shuffle=True, num_workers=6)
     networkTrainer=NetworkTrainer(utilityFunctions.all_classes, training_config, tensorboardWriter)
     trained_model_name= networkTrainer.train(model, alpha_config, beta_config, training_data_loader,  test_data_loader, leads)
 
