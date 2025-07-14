@@ -147,11 +147,11 @@ def train_model(data_folder, model_folder, verbose):
 
     utilityFunctions.prepare_h5_dataset(leads,  train_X, test_X)
     del train_X, test_X
-    training_dataset = HDF5Dataset('./' + utilityFunctions.training_filename, recursive=False, load_data=False, data_cache_size=4, transform=None, leads=leads_idx)
+    training_dataset = HDF5Dataset('./' + utilityFunctions.training_filename, recursive=False, load_data=False, data_cache_size=1, transform=None, leads=leads_idx)
     logger.info("Loaded training dataset")
     weights = utilityFunctions.load_training_weights()
 
-    test_dataset = HDF5Dataset('./' + utilityFunctions.test_filename, recursive=False, load_data=False, data_cache_size=4, transform=None, leads=leads_idx)
+    test_dataset = HDF5Dataset('./' + utilityFunctions.test_filename, recursive=False, load_data=False, data_cache_size=1, transform=None, leads=leads_idx)
     logger.info("Loaded validation dataset")
 
     model = get_MultibranchBeats(alpha_config, beta_config, gamma_config, delta_config, epsilon_config, utilityFunctions.all_classes,device, leads=list(leads))
