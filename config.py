@@ -22,9 +22,9 @@ class ARGS():
         self.network = "LSTM"
         self.include_domain = False
         self.alpha_hidden=11
-        self.alpha_layers=2
+        self.alpha_layers=7
         self.beta_hidden=11
-        self.beta_layers=2
+        self.beta_layers=7
         self.epochs=30
         self.early_stop=6
         self.fold = 1
