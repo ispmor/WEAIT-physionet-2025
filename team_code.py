@@ -165,8 +165,8 @@ def train_model(data_folder, model_folder, verbose):
                                     model_repository=model_folder
                                     )
 
-    training_data_loader = torch_data.DataLoader(training_dataset, batch_size=500, shuffle=True, num_workers=6)
-    test_data_loader = torch_data.DataLoader(test_dataset, batch_size=500, shuffle=True, num_workers=6)
+    training_data_loader = torch_data.DataLoader(training_dataset, batch_size=500, shuffle=True, num_workers=1)
+    test_data_loader = torch_data.DataLoader(test_dataset, batch_size=500, shuffle=True, num_workers=1)
     networkTrainer=NetworkTrainer(utilityFunctions.all_classes, training_config, tensorboardWriter)
     trained_model_name= networkTrainer.train(model, alpha_config, beta_config, training_data_loader,  test_data_loader, leads)
 
