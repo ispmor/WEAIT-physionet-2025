@@ -19,7 +19,7 @@ class ARGS():
         self.debug_mode = True
         self.remove_baseline = False
         self.fold_to_process = ""
-        self.network = "CNN"
+        self.network = "NBEATS"
         self.include_domain = False
         self.alpha_hidden=12
         self.alpha_layers=2

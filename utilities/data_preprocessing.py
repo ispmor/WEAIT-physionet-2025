@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 def batch_preprocessing(batch):
-    return multibranch_cnn_division(batch)
+    return multibranch_division(batch)
 
 
 def multibranch_division(batch):
