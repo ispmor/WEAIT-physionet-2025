@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 *.out
+=======
+.venv
+>>>>>>> experiment/v1.11.1-CNN-ALL-BRANCHES-INCREASED-PENALTY-SIZE-AS-PAPER
 data/
 runs/
 *.json

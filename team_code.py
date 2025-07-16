@@ -52,8 +52,8 @@ early_stop=args.early_stop
 device = torch.device(f"cuda:{gpu_number}" if torch.cuda.is_available() else "cpu")
 alpha_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, window_size, wavelet_features_size, beta_input_size=alpha_input_size)
 beta_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, beta_input_size=beta_input_size)
-gamma_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, beta_input_size=gamma_input_size, channels=1)
-delta_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, beta_input_size=delta_input_size)
+gamma_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, beta_input_size=gamma_input_size)
+delta_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, beta_input_size=delta_input_size, channels=1)
 epsilon_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, window_size, wavelet_features_size, beta_input_size=epsilon_input_size)
 zeta_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, window_size, wavelet_features_size, beta_input_size=zeta_input_size)
 
@@ -74,7 +74,7 @@ def train_model(data_folder, model_folder, verbose):
     date = execution_time.date()
     time = execution_time.time()
     log_filename =f'logs/{name}/{date}/{time}.log'
-    tensorboardWriter: SummaryWriter = SummaryWriter(f"runs/physionet-2025_{date}_{time}")
+    tensorboardWriter: SummaryWriter = SummaryWriter(f"runs/{name}-{date}-{time}")
     os.makedirs(os.path.dirname(log_filename), exist_ok=True)
     logging_level = logging.INFO
     if debug_mode:
@@ -86,7 +86,7 @@ def train_model(data_folder, model_folder, verbose):
                       datefmt='%Y-%m-%d %H:%M:%S')
     logger.info(f"!!! Experiment: {name} !!!")
 
-    utilityFunctions = UtilityFunctions(device, datasets_dir=datasets_target_dir, rr_features_size=delta_input_size, window_size=window_size, wavelet_features_size=wavelet_features_size)
+    utilityFunctions = UtilityFunctions(device, datasets_dir=datasets_target_dir, rr_features_size=gamma_input_size, window_size=window_size, wavelet_features_size=wavelet_features_size)
 
     # Find the data files.
     if verbose:
@@ -116,15 +116,18 @@ def train_model(data_folder, model_folder, verbose):
         header = load_header(record)
         splitted = header.split("\n")
         source_info = [x for x in splitted if "Source" in x]
-        if len(source_info) > 0:
-                        
+        if len(source_info) > 0: 
             if "SaMi-Trop" in source_info[0]:
                 sami_trop_headers.append(os.path.join(data_folder, get_header_file(records[i])))
                 sami_trop_recordings.append(record)     
                 continue
-            else:
+            elif "CODE" in source_info[0]:
                 if random.random() > 0.05:
                     continue
+            else:
+                if random.random() > 0.1:
+                    continue
+
         
         header_files.append(os.path.join(data_folder, get_header_file(records[i])))
         record_files.append(record)
@@ -155,9 +158,9 @@ def train_model(data_folder, model_folder, verbose):
     training_config = TrainingConfig(batch_size=500,
                                     n_epochs_stop=early_stop,
                                     num_epochs=epochs,
-                                    lr_rate=0.01,
+                                    lr_rate=0.001,
                                     criterion=BCEWithLogitsLoss(pos_weight=weights),
-                                    optimizer=torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.01),
+                                    optimizer=torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.001),
                                     device=device,
                                     model_repository=model_folder
                                     )
@@ -201,14 +204,14 @@ def run_model(record, model, verbose):
                       datefmt='%Y-%m-%d %H:%M:%S')
     logger.info(f"!!! Experiment: {name} !!!")
 
-    utilityFunctions = UtilityFunctions(device, rr_features_size=delta_input_size, window_size=window_size, wavelet_features_size=wavelet_features_size)
+    utilityFunctions = UtilityFunctions(device, rr_features_size=gamma_input_size, window_size=window_size, wavelet_features_size=wavelet_features_size)
     # Extract the features.
     header = load_header(record)
     header_file = record + ".hea"
     print(f"Processing {header_file}")
 
     try:
-        signal, fields = load_signals(record)
+        age, sex_one_hot_encoding, source, signal_mean, signal_std, signal, fields = utilityFunctions.extract_features(record)
     except Exception as e:
         print(f"Skipping {header_file} and associated recording  because of {e}")
         return 0.0, 0.0
@@ -216,16 +219,7 @@ def run_model(record, model, verbose):
     recording_full=utilityFunctions.load_and_equalize_recording(signal, fields, header_file, 400)
     drift_removed_recording, recording, signals, infos, peaks, rates = utilityFunctions.preprocess_recording(recording_full, header,  leads_idxs=utility_functions.leads_idxs_dict[len(leads)])
             
-    dataset_label = np.array([0,0,1]) #We have 3 labels known now - CODE, SAMI-TROP and Unknown, default is unknown
-    if "comments" in fields:
-        source_info = [x for x in fields["comments"] if "Source" in x]
-        if len(source_info) > 0:
-            if "CODE" in source_info[0]:
-                dataset_label = np.array([1,0,0])
-                        
-            elif "SaMi-Trop" in source_info[0]:
-                dataset_label = np.array([0,1,0])
-                    
+    recording_features_record = np.concatenate((age, sex_one_hot_encoding, signal_mean, signal_std))
 
     if signals is None or infos is None or peaks is None or rates is None:
         print("Failed to extract needed data - returning zeros")
@@ -235,19 +229,20 @@ def run_model(record, model, verbose):
 
 
     recording_raw, recording_drift_removed, rr_features, wavelet_features= utilityFunctions.one_file_training_data(recording, drift_removed_recording, signals, infos, rates, utilityFunctions.window_size, peaks, header, leads)
+    logger.info(f"RAW: {recording_raw.shape}, DRIFT: {recording_drift_removed.shape}, DOMAIN: {rr_features.shape}, Wavelets: {wavelet_features.shape}")
 
-    dataset_label = torch.Tensor(np.array([dataset_label] * recording_raw.shape[0])).to(device)
+    recording_features = torch.Tensor(np.array([recording_features_record] * recording_raw.shape[0])).to(device)
 
     recording_raw = torch.Tensor(recording_raw).to(device)
     recording_drift_removed = torch.Tensor(recording_drift_removed).to(device)
     rr_features = torch.Tensor(rr_features).to(device)
     wavelet_features = torch.Tensor(wavelet_features).to(device)
 
-    batch = (recording_raw, recording_drift_removed,  None, rr_features, wavelet_features, dataset_label)
-    alpha_input, beta_input, gamma_input, delta_input, epsilon_input, dataset_label, _= batch_preprocessing(batch)
+    batch = (recording_raw, recording_drift_removed,  None, rr_features, wavelet_features, recording_features)
+    alpha_input, beta_input, gamma_input, delta_input, epsilon_input, recording_features, _= batch_preprocessing(batch)
     # Get the model outputs.
     try:
-        model_outputs = model(alpha_input, beta_input, gamma_input, delta_input, epsilon_input, dataset_label)
+        model_outputs = model(alpha_input, beta_input, gamma_input, delta_input, epsilon_input, recording_features)
         probability_output = torch.mean(torch.nn.functional.sigmoid(model_outputs), 0).detach().cpu().numpy()[0]
         binary_output = float(probability_output > 0.5)
         return binary_output, probability_output
@@ -261,55 +256,6 @@ def run_model(record, model, verbose):
 # Optional functions. You can change or remove these functions and/or add new functions.
 #
 ################################################################################
-
-# Extract your features.
-def extract_features(record):
-    header = load_header(record)
-
-    # Extract the age from the record.
-    age = get_age(header)
-    age = np.array([age])
-
-    # Extract the sex from the record and represent it as a one-hot encoded vector.
-    sex = get_sex(header)
-    sex_one_hot_encoding = np.zeros(3, dtype=bool)
-    if sex.casefold().startswith('f'):
-        sex_one_hot_encoding[0] = 1
-    elif sex.casefold().startswith('m'):
-        sex_one_hot_encoding[1] = 1
-    else:
-        sex_one_hot_encoding[2] = 1
-
-    # Extract the source from the record (but do not use it as a feature).
-    source = get_source(header)
-
-    # Load the signal data and fields. Try fields.keys() to see the fields, e.g., fields['fs'] is the sampling frequency.
-    signal, fields = load_signals(record)
-    channels = fields['sig_name']
-
-    # Reorder the channels in case they are in a different order in the signal data.
-    reference_channels = ['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
-    num_channels = len(reference_channels)
-    signal = reorder_signal(signal, channels, reference_channels)
-
-    # Compute two per-channel features as examples.
-    signal_mean = np.zeros(num_channels)
-    signal_std = np.zeros(num_channels)
-
-    for i in range(num_channels):
-        num_finite_samples = np.sum(np.isfinite(signal[:, i]))
-        if num_finite_samples > 0:
-            signal_mean[i] = np.nanmean(signal)
-        else:
-            signal_mean = 0.0
-        if num_finite_samples > 1:
-            signal_std[i] = np.nanstd(signal)
-        else:
-            signal_std = 0.0
-
-    # Return the features.
-
-    return age, sex_one_hot_encoding, source, signal_mean, signal_std
 
 # Save your trained model.
 def save_model(model_folder, model):
