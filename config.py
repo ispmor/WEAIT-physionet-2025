@@ -5,7 +5,7 @@ class ARGS():
         self.input = "/home/data/"
         self.output =  "/home/results/"
         self.target =  "data/h5_datasets/"
-        self.gpu = 0
+        self.gpu = 2
         self.model = "/home/models/"
         self.clean = False
         self.window_size=1500
