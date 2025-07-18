@@ -52,8 +52,8 @@ early_stop=args.early_stop
 device = torch.device(f"cuda:{gpu_number}" if torch.cuda.is_available() else "cpu")
 alpha_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, window_size, wavelet_features_size, beta_input_size=alpha_input_size)
 beta_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, beta_input_size=beta_input_size)
-gamma_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, beta_input_size=gamma_input_size, channels=1)
-delta_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, beta_input_size=delta_input_size)
+gamma_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, beta_input_size=gamma_input_size)
+delta_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, beta_input_size=delta_input_size, channels=1)
 epsilon_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, window_size, wavelet_features_size, beta_input_size=epsilon_input_size)
 zeta_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, window_size, wavelet_features_size, beta_input_size=zeta_input_size)
 
@@ -74,7 +74,7 @@ def train_model(data_folder, model_folder, verbose):
     date = execution_time.date()
     time = execution_time.time()
     log_filename =f'logs/{name}/{date}/{time}.log'
-    tensorboardWriter: SummaryWriter = SummaryWriter(f"runs/physionet-2025")
+    tensorboardWriter: SummaryWriter = SummaryWriter(f"runs/{name}-{date}-{time}")
     os.makedirs(os.path.dirname(log_filename), exist_ok=True)
     logging_level = logging.INFO
     if debug_mode:
@@ -86,7 +86,7 @@ def train_model(data_folder, model_folder, verbose):
                       datefmt='%Y-%m-%d %H:%M:%S')
     logger.info(f"!!! Experiment: {name} !!!")
 
-    utilityFunctions = UtilityFunctions(device, datasets_dir=datasets_target_dir, rr_features_size=delta_input_size, window_size=window_size, wavelet_features_size=wavelet_features_size)
+    utilityFunctions = UtilityFunctions(device, datasets_dir=datasets_target_dir, rr_features_size=gamma_input_size, window_size=window_size, wavelet_features_size=wavelet_features_size)
 
     # Find the data files.
     if verbose:
@@ -155,18 +155,18 @@ def train_model(data_folder, model_folder, verbose):
     logger.info("Loaded validation dataset")
 
     model = get_MultibranchBeats(alpha_config, beta_config, gamma_config, delta_config, epsilon_config, utilityFunctions.all_classes,device, leads=list(leads))
-    training_config = TrainingConfig(batch_size=500,
+    training_config = TrainingConfig(batch_size=200,
                                     n_epochs_stop=early_stop,
                                     num_epochs=epochs,
-                                    lr_rate=0.01,
+                                    lr_rate=0.001,
                                     criterion=BCEWithLogitsLoss(pos_weight=weights),
-                                    optimizer=torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.01),
+                                    optimizer=torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.001),
                                     device=device,
                                     model_repository=model_folder
                                     )
 
-    training_data_loader = torch_data.DataLoader(training_dataset, batch_size=500, shuffle=True, num_workers=6)
-    test_data_loader = torch_data.DataLoader(test_dataset, batch_size=500, shuffle=True, num_workers=6)
+    training_data_loader = torch_data.DataLoader(training_dataset, batch_size=200, shuffle=True, num_workers=6)
+    test_data_loader = torch_data.DataLoader(test_dataset, batch_size=200, shuffle=True, num_workers=6)
     networkTrainer=NetworkTrainer(utilityFunctions.all_classes, training_config, tensorboardWriter)
     trained_model_name= networkTrainer.train(model, alpha_config, beta_config, training_data_loader,  test_data_loader, leads)
 
@@ -204,7 +204,7 @@ def run_model(record, model, verbose):
                       datefmt='%Y-%m-%d %H:%M:%S')
     logger.info(f"!!! Experiment: {name} !!!")
 
-    utilityFunctions = UtilityFunctions(device, rr_features_size=delta_input_size, window_size=window_size, wavelet_features_size=wavelet_features_size)
+    utilityFunctions = UtilityFunctions(device, rr_features_size=gamma_input_size, window_size=window_size, wavelet_features_size=wavelet_features_size)
     # Extract the features.
     header = load_header(record)
     header_file = record + ".hea"
@@ -229,6 +229,7 @@ def run_model(record, model, verbose):
 
 
     recording_raw, recording_drift_removed, rr_features, wavelet_features= utilityFunctions.one_file_training_data(recording, drift_removed_recording, signals, infos, rates, utilityFunctions.window_size, peaks, header, leads)
+    logger.info(f"RAW: {recording_raw.shape}, DRIFT: {recording_drift_removed.shape}, DOMAIN: {rr_features.shape}, Wavelets: {wavelet_features.shape}")
 
     recording_features = torch.Tensor(np.array([recording_features_record] * recording_raw.shape[0])).to(device)
 
