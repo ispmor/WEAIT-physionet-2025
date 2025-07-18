@@ -160,7 +160,7 @@ def train_model(data_folder, model_folder, verbose):
                                     num_epochs=epochs,
                                     lr_rate=0.001,
                                     criterion=BCEWithLogitsLoss(pos_weight=weights),
-                                    optimizer=torch.optim.NAdam(model.parameters(), lr=0.001),
+                                    optimizer=torch.optim.Adam(model.parameters(), lr=0.001),
                                     device=device,
                                     model_repository=model_folder
                                     )
