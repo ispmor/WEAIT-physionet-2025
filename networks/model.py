@@ -400,6 +400,7 @@ class PositionalEncoder(nn.Module):
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         self.pe = pe.unsqueeze(0)
+        self.pe.to(device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         logger.debug(f"shape input: {x.shape}")
