@@ -392,11 +392,11 @@ class Conv1dECG(nn.Module):
 
 
 class PositionalEncoder(nn.Module):
-    def __init__(self, d_model: int, max_len: int):
+    def __init__(self, d_model: int, max_len: int, device):
         super(PositionalEncoder, self).__init__()
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe = torch.zeros(max_len, d_model, device=device)
+        position = torch.arange(0, max_len, dtype=torch.float, device=device).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2, device=device).float() * (-math.log(10000.0) / d_model))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         self.pe = pe.unsqueeze(0)
@@ -410,10 +410,10 @@ class PositionalEncoder(nn.Module):
 
 
 class CNNTransformer(nn.Module):
-    def __init__(self, d_model:int, max_len:int, in_channels:int, num_filters:int, num_classes:int, input_size:int):
+    def __init__(self, d_model:int, max_len:int, in_channels:int, num_filters:int, num_classes:int, input_size:int, device):
         super(CNNTransformer, self).__init__()
         self.cnn = Conv1dECG(in_channels, num_filters, num_classes, input_size)
-        self.pos_encoder = PositionalEncoder(d_model, max_len)
+        self.pos_encoder = PositionalEncoder(d_model, max_len, device)
         self.transformer_encoder1 = nn.TransformerEncoderLayer(d_model=d_model, nhead=4, batch_first=True)
         self.transformer_encoder2 = nn.TransformerEncoderLayer(d_model=d_model, nhead=4, batch_first=True)
         self.adaptive_avg_pool = nn.AdaptiveAvgPool1d(1)
@@ -490,7 +490,8 @@ def get_single_network(network, hs, layers, leads, selected_classes, single_peak
                 in_channels=leads,
                 num_filters=hs,
                 num_classes=len(selected_classes),
-                input_size=b_in
+                input_size=b_in,
+                device=device
                 )
 
 
