@@ -383,12 +383,64 @@ class Conv1dECG(nn.Module):
         x = self.fc(x)
         logger.debug(f"shape after FC: {x.shape}")
         x = self.swish5(x)
-        x = torch.squeeze(x, dim=2)
-        x = self.fc2(x)
-        logger.debug(f"shape after FC2: {x.shape}")
-        x = self.swish6(x)
-        logger.debug(f"----------RETURN-------------")
+        #x = torch.squeeze(x, dim=2)
+        #x = self.fc2(x)
+        #logger.debug(f"shape after FC2: {x.shape}")
+        #x = self.swish6(x)
+        #logger.debug(f"----------RETURN-------------")
         return x
+
+
+class PositionalEncoder(nn.Module):
+    def __init__(self, d_model: int, max_len: int):
+        super(PositionalEncoder, self).__init__()
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        self.pe = pe.unsqueeze(0)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        logger.debug(f"shape input: {x.shape}")
+        logger.debug(f"shape PE: {self.pe.shape}")
+        seq_len = x.size(1)
+        return x + self.pe[:, :seq_len]
+
+
+
+class CNNTransformer(nn.Module):
+    def __init__(self, d_model:int, max_len:int, in_channels:int, num_filters:int, num_classes:int, input_size:int):
+        super(CNNTransformer, self).__init__()
+        self.cnn = Conv1dECG(in_channels, num_filters, num_classes, input_size)
+        self.pos_encoder = PositionalEncoder(d_model, max_len)
+        self.transformer_encoder1 = nn.TransformerEncoderLayer(d_model=d_model, nhead=4, batch_first=True)
+        self.transformer_encoder2 = nn.TransformerEncoderLayer(d_model=d_model, nhead=4, batch_first=True)
+        self.adaptive_avg_pool = nn.AdaptiveAvgPool1d(1)
+        self.fc = nn.Linear(576,1)
+
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        logger.debug(f"shape at input: {x.shape}")
+        x = self.cnn(x)
+        logger.debug(f"shape after CNN: {x.shape}")
+        x = self.pos_encoder(x)
+        logger.debug(f"shape after POS_ENCODER: {x.shape}")
+        x = self.transformer_encoder1(x)
+        logger.debug(f"shape after TRANSFORMER 1: {x.shape}")
+        x = self.transformer_encoder2(x)
+        logger.debug(f"shape after TRANSFORMER 2: {x.shape}")
+        x = self.adaptive_avg_pool(x)
+        logger.debug(f"shape after AVG POOL: {x.shape}")
+        x = torch.squeeze(x, dim=2)
+        logger.debug(f"shape after SQUEEZE: {x.shape}")
+        x = self.fc(x)
+        logger.debug(f"shape after FC: {x.shape}")
+        return x
+
+
+
+
 
 class MultibranchBeats(nn.Module):
     def __init__(self, modelA, modelB, modelC, modelD, modelE, classes):
@@ -407,13 +459,13 @@ class MultibranchBeats(nn.Module):
         logger.debug(f"Alpha input shape: {alpha_input.shape}\nBeta input shape: {beta_input.shape}\nGamma input shape: {gamma_input.shape}\nDelta input shape: {delta_input.shape}")
         logger.debug(f"Dataset label: {recording_features.shape}")
 
-        outA = self.modelA(alpha_input)
-        outB = self.modelB(beta_input)
-        outC = self.modelC(gamma_input)
-        outD = self.modelD(delta_input)
+        #outA = self.modelA(alpha_input)
+        #outB = self.modelB(beta_input)
+        #outC = self.modelC(gamma_input)
+        #outD = self.modelD(delta_input)
         outE = self.modelE(epsilon_input)
-        outF = self.modelF(recording_features)
-        logger.debug(f"Alpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}, Epsilon output shape: {outE.shape}, Zeta shape: {outF.shape}")
+        #outF = self.modelF(recording_features)
+        #logger.debug(f"Alpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}, Epsilon output shape: {outE.shape}, Zeta shape: {outF.shape}")
 
         #outA = torch.squeeze(outA, dim=2) 
         #outB = torch.squeeze(outB, dim=2)
@@ -422,13 +474,27 @@ class MultibranchBeats(nn.Module):
         #outE = torch.squeeze(outE, dim=2)
         #logger.debug(f"-------- AFTER SQUEEZE ---- \nAlpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}\nEpsilon output shape: {outE.shape}\n Zeta shape: {outF.shape}")
 
-        out_concat = F.relu(torch.cat((outA, outB, outC, outD, outE, outF), dim=1))
-        out = self.linear(out_concat)
+        out = F.relu(outE)
+        #out_concat = F.relu(torch.cat((outA, outB, outC, outD, outE, outF), dim=1))
+        #out = self.linear(out_concat)
         return out
 
 
 def get_single_network(network, hs, layers, leads, selected_classes, single_peak_length,a1_in, a2_in, b_in, as_branch, device):
     torch.manual_seed(17)
+
+    if network == "TRANSFORMER":
+        return CNNTransformer(
+                d_model=512,
+                max_len=576,
+                in_channels=leads,
+                num_filters=hs,
+                num_classes=len(selected_classes),
+                input_size=b_in
+                )
+
+
+
 
     if network == "CNN":
         return Conv1dECG(
