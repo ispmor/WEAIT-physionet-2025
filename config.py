@@ -29,6 +29,6 @@ class ARGS():
         self.early_stop=30
         self.fold = 1
         self.leads = "12"
-        self.name = f"{self.network}_kernel_75_{self.leads}_{datetime.today().strftime('%Y-%m-%d')}"
+        self.name = f"{self.network}_kernel_45_{self.leads}_{datetime.today().strftime('%Y-%m-%d')}"
 
 

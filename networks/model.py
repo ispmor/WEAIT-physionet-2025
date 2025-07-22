@@ -317,7 +317,7 @@ class Conv1dECG(nn.Module):
     def __init__(self, in_channels, num_filters, num_classes, input_size):
         super().__init__()
         logger.info(f"in_channels={in_channels}, num_filters={num_filters}, num_classes={num_classes}")
-        self.conv1left = nn.Conv1d(in_channels, num_filters , kernel_size=75, stride=1, padding=37)
+        self.conv1left = nn.Conv1d(in_channels, num_filters , kernel_size=45, stride=1, padding=22)
         self.conv1right = nn.Conv1d(in_channels, num_filters, kernel_size=1, stride=1, padding=0)
         self.swish1 = nn.SiLU()
         self.spatialDropout1 = nn.Dropout1d(p=0.3)
