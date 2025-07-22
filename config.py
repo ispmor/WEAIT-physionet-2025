@@ -21,14 +21,14 @@ class ARGS():
         self.fold_to_process = ""
         self.network = "CNN"
         self.include_domain = False
-        self.alpha_hidden=81
+        self.alpha_hidden=63
         self.alpha_layers=2
-        self.beta_hidden=81
+        self.beta_hidden=63
         self.beta_layers=2
         self.epochs=50
         self.early_stop=30
         self.fold = 1
         self.leads = "12"
-        self.name = f"{self.network}_channels_81_{self.leads}_{datetime.today().strftime('%Y-%m-%d')}"
+        self.name = f"{self.network}_filters_63_{self.leads}_{datetime.today().strftime('%Y-%m-%d')}"
 
 
