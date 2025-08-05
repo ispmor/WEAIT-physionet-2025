@@ -25,8 +25,8 @@ class ARGS():
         self.alpha_layers=2
         self.beta_hidden=12
         self.beta_layers=2
-        self.epochs=30
-        self.early_stop=6
+        self.epochs=100
+        self.early_stop=15
         self.fold = 1
         self.leads = "12"
         self.name = f"{self.network}_{self.leads}_{datetime.today().strftime('%Y-%m-%d')}"
