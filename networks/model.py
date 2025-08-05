@@ -106,20 +106,20 @@ class Block(nn.Module):
         in_channels = units
         self.conv1left = nn.Conv1d(in_channels, num_filters , kernel_size=15, stride=1, padding=7)
         self.swish1 = nn.SiLU()
-        self.spatialDropout1 = nn.Dropout1d(p=0.2)
+        self.spatialDropout1 = nn.Dropout1d(p=0.3)
         self.avg_pooling = nn.AvgPool1d(3, stride=2, padding=1)
         
         self.conv2left = nn.Conv1d(num_filters, num_filters * 2 , kernel_size=3, stride=1, padding=1)
         self.swish2 = nn.SiLU()
-        self.spatialDropout2 = nn.Dropout1d(p=0.2)
+        self.spatialDropout2 = nn.Dropout1d(p=0.3)
         
         self.conv3left = nn.Conv1d(num_filters * 2, num_filters * 4, kernel_size=5, stride=1, padding=2)
         self.swish3 = nn.SiLU()
-        self.spatialDropout3 = nn.Dropout1d(p=0.2)
+        self.spatialDropout3 = nn.Dropout1d(p=0.3)
         
         self.conv4left = nn.Conv1d(num_filters * 4, num_filters * 8 , kernel_size=7, stride=1, padding=3)
         self.swish4 = nn.SiLU()
-        self.spatialDropout4 = nn.Dropout1d(p=0.2)
+        self.spatialDropout4 = nn.Dropout1d(p=0.3)
         
         self.conv5left = nn.Conv1d(num_filters * 8, units , kernel_size=7, stride=1, padding=3)
         self.swish5 = nn.SiLU()
