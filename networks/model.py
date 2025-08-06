@@ -422,6 +422,7 @@ class MultibranchBeats(nn.Module):
         #outE = torch.squeeze(outE, dim=2)
         #logger.debug(f"-------- AFTER SQUEEZE ---- \nAlpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}\nEpsilon output shape: {outE.shape}\n Zeta shape: {outF.shape}")
 
+        outF = outF.unsqueeze(2)
         out_stacked = F.relu(torch.stack((outA, outB, outC, outD, outE, outF), dim=1))
         logger.debug(f"Shape after stack: {out_stacked.shape}")
 
