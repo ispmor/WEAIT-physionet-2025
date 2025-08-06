@@ -379,10 +379,10 @@ class Conv1dECG(nn.Module):
         x = self.avg_pooling(x)
         logger.debug(f"shape after avg_pooling: {x.shape}")
 
-        logger.debug(f"------------FC--------------")
-        x = self.fc(x)
-        logger.debug(f"shape after FC: {x.shape}")
-        x = self.swish5(x)
+        #logger.debug(f"------------FC--------------")
+        #x = self.fc(x)
+        #logger.debug(f"shape after FC: {x.shape}")
+        #x = self.swish5(x)
         #x = torch.squeeze(x, dim=2)
         #x = self.fc2(x)
         #logger.debug(f"shape after FC2: {x.shape}")
@@ -423,7 +423,7 @@ class MultibranchBeats(nn.Module):
         #logger.debug(f"-------- AFTER SQUEEZE ---- \nAlpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}\nEpsilon output shape: {outE.shape}\n Zeta shape: {outF.shape}")
 
         outF = outF.unsqueeze(2)
-        out_stacked = F.relu(torch.stack((outA, outB, outC, outD, outE, outF), dim=1))
+        out_stacked = F.relu(torch.stack((outA, outB, outC, outD, outE), dim=1))
         logger.debug(f"Shape after stack: {out_stacked.shape}")
 
         out = self.linear(out_stacked)
