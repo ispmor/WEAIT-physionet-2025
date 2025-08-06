@@ -400,7 +400,9 @@ class MultibranchBeats(nn.Module):
         self.modelE = modelE
         self.modelF = nn.Linear(28, len(classes))
         self.classes = classes
-        self.linear = nn.Linear(6,  1)#6 * len(classes), len(classes)) 
+        self.conv = nn.Conv2d(in_channels=5, out_channels=64, kernel_size=3, stride=2, padding=1)
+        self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.linear = nn.Linear(64,  1)#6 * len(classes), len(classes)) 
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, alpha_input, beta_input, gamma_input, delta_input, epsilon_input, recording_features):
@@ -422,11 +424,15 @@ class MultibranchBeats(nn.Module):
         #outE = torch.squeeze(outE, dim=2)
         #logger.debug(f"-------- AFTER SQUEEZE ---- \nAlpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}\nEpsilon output shape: {outE.shape}\n Zeta shape: {outF.shape}")
 
-        outF = outF.unsqueeze(2)
         out_stacked = F.relu(torch.stack((outA, outB, outC, outD, outE), dim=1))
         logger.debug(f"Shape after stack: {out_stacked.shape}")
-
-        out = self.linear(out_stacked)
+        out_conv = F.relu(self.conv(out_stacked))
+        logger.debug(f"Shape after conv: {out_conv.shape}")
+        out = self.global_pool(out_conv)
+        logger.debug(f"Shape after global pool: {out.shape}")
+        out = torch.flatten(out,1)
+        logger.debug(f"Shape after flatten: {out.shape}")
+        out = self.linear(out)
         return out
 
 
