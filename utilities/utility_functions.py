@@ -318,14 +318,12 @@ class UtilityFunctions:
                 print(f"Skipping {header_file} and associated recording  because of {e}")
                 continue
 
+
             recording_features_record = np.concatenate((age, sex_one_hot_encoding, signal_mean, signal_std))
 
             weight_multiplier = 10
             if source is None:
                 source = ""
-            #if "sami" not in source.lower():
-            #    weight_multiplier = 100
-                    
 
 
 

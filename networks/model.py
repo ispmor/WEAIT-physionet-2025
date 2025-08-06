@@ -94,36 +94,89 @@ def linspace(backcast_length, forecast_length):
 
 
 class Block(nn.Module):
-    def __init__(self, units, thetas_dim, backcast_length=10, forecast_length=5, share_thetas=False, classes=16):
+    def __init__(self, units, thetas_dim, backcast_length=10, forecast_length=5, share_thetas=False, classes=1):
         super(Block, self).__init__()
         self.units = units
         self.thetas_dim = thetas_dim
         self.backcast_length = backcast_length
         self.forecast_length = forecast_length
         self.share_thetas = share_thetas
-        self.fc1 = nn.Linear(backcast_length, units)
-        self.fc2 = nn.Linear(units, units)
-        self.fc3 = nn.Linear(units, units)
-        self.fc4 = nn.Linear(units, units)
-        self.backcast_linspace, self.forecast_linspace = linspace(backcast_length, forecast_length)
+
+        num_filters = 72
+        in_channels = units
+        self.conv1left = nn.Conv1d(in_channels, num_filters , kernel_size=15, stride=1, padding=7)
+        self.swish1 = nn.SiLU()
+        self.spatialDropout1 = nn.Dropout1d(p=0.3)
+        self.avg_pooling = nn.AvgPool1d(3, stride=2, padding=1)
+        
+        self.conv2left = nn.Conv1d(num_filters, num_filters * 2 , kernel_size=3, stride=1, padding=1)
+        self.swish2 = nn.SiLU()
+        self.spatialDropout2 = nn.Dropout1d(p=0.3)
+        
+        self.conv3left = nn.Conv1d(num_filters * 2, num_filters * 4, kernel_size=5, stride=1, padding=2)
+        self.swish3 = nn.SiLU()
+        self.spatialDropout3 = nn.Dropout1d(p=0.3)
+        
+        self.conv4left = nn.Conv1d(num_filters * 4, num_filters * 8 , kernel_size=7, stride=1, padding=3)
+        self.swish4 = nn.SiLU()
+        self.spatialDropout4 = nn.Dropout1d(p=0.3)
+        
+        self.conv5left = nn.Conv1d(num_filters * 8, units , kernel_size=7, stride=1, padding=3)
+        self.swish5 = nn.SiLU()
+            
+        self.fc = nn.Linear(math.ceil(backcast_length/16.0), backcast_length)
+        self.swish6 = nn.SiLU()
+
         self.classes = classes
 
-        if share_thetas:
-            self.theta_f_fc = self.theta_b_fc = nn.Linear(units, thetas_dim)
-        else:
-            self.theta_b_fc = nn.Linear(units, thetas_dim)
-            self.theta_f_fc = nn.Linear(units, thetas_dim)
+        self.theta_b_fc = nn.Linear(backcast_length, thetas_dim)
+        self.theta_f_fc = nn.Linear(backcast_length, thetas_dim)
 
     def forward(self, x):
-        logger.debug(f"NBeats Block forward - INPUT  shape: {x.shape}")
-        x = F.relu(self.fc1(x))
-        logger.debug(f"NBeats Block forward - FC1 output shape: {x.shape}")
-        x = F.relu(self.fc2(x))
-        logger.debug(f"NBeats Block forward - FC2 output  shape: {x.shape}")
-        x = F.relu(self.fc3(x))
-        logger.debug(f"NBeats Block forward - FC3 output  shape: {x.shape}")
-        x = F.relu(self.fc4(x))
-        logger.debug(f"NBeats Block forward - FC4 output  shape: {x.shape}")
+        logger.debug(f"----------START-------------")
+        x_left = self.conv1left(x)
+        logger.debug(f"x_left shape: {x_left.shape}")
+        x = self.swish1(x_left)
+        logger.debug(f"shape after swish1: {x.shape}")
+        x = self.spatialDropout1(x)
+        logger.debug(f"shape after dropou: {x.shape}")
+        x = self.avg_pooling(x)
+        logger.debug(f"shape after avg_pooling: {x.shape}")
+        
+        logger.debug(f"------------2---------------")
+        x = self.swish2(self.conv2left(x) )
+        logger.debug(f"shape after swish1: {x.shape}")
+        x = self.spatialDropout2(x)
+        logger.debug(f"shape after dropou: {x.shape}")
+        x = self.avg_pooling(x)
+        logger.debug(f"shape after avg_pooling: {x.shape}")
+        
+        logger.debug(f"------------3---------------")
+        x = self.swish3(self.conv3left(x) )
+        logger.debug(f"shape after swish1: {x.shape}")
+        x = self.spatialDropout3(x)
+        logger.debug(f"shape after dropou: {x.shape}")
+        x = self.avg_pooling(x)
+        logger.debug(f"shape after avg_pooling: {x.shape}")
+
+        logger.debug(f"------------4---------------")
+        x = self.swish4(self.conv4left(x) )
+        logger.debug(f"shape after swish1: {x.shape}")
+        x = self.spatialDropout4(x)
+        logger.debug(f"shape after dropou: {x.shape}")
+        x = self.avg_pooling(x)
+        logger.debug(f"shape after avg_pooling: {x.shape}")
+        logger.debug(f"------------5---------------")
+        x = self.swish5(self.conv5left(x) )
+        logger.debug(f"shape after swish5: {x.shape}")
+
+        logger.debug(f"------------FC--------------")
+        x = self.fc(x)
+        logger.debug(f"shape after FC: {x.shape}")
+        x = self.swish6(x)
+        logger.debug(f"shape after squeeze: {x.shape}")
+        logger.debug(f"----------RETURN-------------")
+
         return x
 
     def __str__(self):
@@ -144,9 +197,13 @@ class GenericBlock(Block):
     def forward(self, x):
         logger.debug(f"NBeats Generic Block forward. Input shape: {x.shape}")
         x = super(GenericBlock, self).forward(x)
+        
+        logger.debug(f"NBeats Block forward - Basic block output  shape: {x.shape}")
 
         theta_b = F.relu(self.theta_b_fc(x))
+        logger.debug(f"NBeats Block forward - THETA B output  shape: {theta_b.shape}")
         theta_f = F.relu(self.theta_f_fc(x))  # tutaj masz thetas_dim rozmiar
+        logger.debug(f"NBeats Block forward - THETA F output  shape: {theta_f.shape}")
 
         backcast = self.backcast_fc(theta_b)  # generic. 3.3.
         forecast = self.forecast_fc(theta_f)  # generic. 3.3.
@@ -196,8 +253,9 @@ class Nbeats_beta(nn.Module):
                                      hidden_layer_units=self.hidden_size,
                                      input_features_size=input_features_size_b)
 
-        self.fc = nn.Linear( input_features_size_b * self.input_size,
+        self.fc = nn.Linear(self.input_size,
                             num_classes)  # hidden_size, 128)  # fully connected 1# fully connected last layer
+        self.fc2 = nn.Linear(self.hidden_size, num_classes)
         self.dropoutNBEATS = nn.Dropout(0.5)
         self.dropoutFC = nn.Dropout(0.5)
         logger.debug(f"{self}")
@@ -211,10 +269,14 @@ class Nbeats_beta(nn.Module):
         logger.debug(f"Nbeats_beta OUTPUT shape: {output_beta.shape}")
         output_beta = self.dropoutNBEATS(output_beta)
         logger.debug(f"Nbeats_beta DROPOUT OUTPUT shape: {output_beta.shape}")
-        tmp = torch.flatten(output_beta, start_dim=1)
-        out = self.relu(tmp)  # relu
+        out = self.relu(output_beta)  # relu
         out = self.fc(out)  # Final Output
+        logger.debug(f"Nbeats_beta fc output shape: {out.shape}")
         out = self.dropoutFC(out)
+        out = torch.squeeze(out, dim=2)
+        logger.debug(f"Nbeats_beta squeezed output shape: {out.shape}")
+        out = self.relu(self.fc2(out))
+        logger.debug(f"Nbeats_beta fc2 output shape: {out.shape}")
         return out
 
 
@@ -507,11 +569,16 @@ class BranchConfig:
 
 
 def get_MultibranchBeats(alpha_config: BranchConfig, beta_config: BranchConfig, gamma_config: BranchConfig, delta_config: BranchConfig, epsilon_config: BranchConfig, classes: list, device, leads) -> MultibranchBeats:
-    alpha_branch = get_single_network(alpha_config.network_name, alpha_config.hidden_size, None, len(leads), classes, None, None, None, alpha_config.beta_input_size, None, device)
-    beta_branch = get_single_network(beta_config.network_name, beta_config.hidden_size, None, len(leads), classes, None, None, None, beta_config.beta_input_size, None, device)
-    gamma_branch = get_single_network(gamma_config.network_name, gamma_config.hidden_size, None, len(leads), classes, None, None, None, gamma_config.beta_input_size, None, device)
-    delta_branch = get_single_network(delta_config.network_name, delta_config.hidden_size, None, delta_config.channels, classes, None, None, None, delta_config.beta_input_size, None, device)
-    epsilon_branch = get_single_network(epsilon_config.network_name, epsilon_config.hidden_size, None, len(leads), classes, None, None, None, epsilon_config.beta_input_size, None, device)
+    alpha_branch = get_single_network(alpha_config.network_name, alpha_config.hidden_size, alpha_config.layers, 1500, classes, alpha_config.single_peak_length, None, None, alpha_config.beta_input_size, "beta", device)
+    beta_branch = get_single_network(beta_config.network_name, beta_config.hidden_size, beta_config.layers, 759, classes, beta_config.single_peak_length, None, None, beta_config.beta_input_size, "beta", device)
+    gamma_branch = get_single_network(gamma_config.network_name, gamma_config.hidden_size, gamma_config.layers, 256, classes, gamma_config.single_peak_length, None, None, gamma_config.beta_input_size, "beta", device)
+    delta_branch = get_single_network(delta_config.network_name, 1, delta_config.layers, 10668, classes, delta_config.single_peak_length, None, None, delta_config.beta_input_size, "beta", device)
+    epsilon_branch = get_single_network(epsilon_config.network_name, epsilon_config.hidden_size, epsilon_config.layers, 1500, classes, epsilon_config.single_peak_length, None, None, epsilon_config.beta_input_size, "beta", device)
+    #alpha_branch = get_single_network(alpha_config.network_name, alpha_config.hidden_size, None, len(leads), classes, None, None, None, alpha_config.beta_input_size, None, device)
+    #beta_branch = get_single_network(beta_config.network_name, beta_config.hidden_size, None, len(leads), classes, None, None, None, beta_config.beta_input_size, None, device)
+    #gamma_branch = get_single_network(gamma_config.network_name, gamma_config.hidden_size, None, len(leads), classes, None, None, None, gamma_config.beta_input_size, None, device)
+    #delta_branch = get_single_network(delta_config.network_name, delta_config.hidden_size, None, delta_config.channels, classes, None, None, None, delta_config.beta_input_size, None, device)
+    #epsilon_branch = get_single_network(epsilon_config.network_name, epsilon_config.hidden_size, None, len(leads), classes, None, None, None, epsilon_config.beta_input_size, None, device)
 
     return MultibranchBeats(alpha_branch, beta_branch, gamma_branch, delta_branch, epsilon_branch, classes)
 
