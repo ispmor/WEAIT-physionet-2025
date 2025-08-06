@@ -338,7 +338,7 @@ class Conv1dECG(nn.Module):
         self.swish4 = nn.SiLU()
         self.spatialDropout4 = nn.Dropout1d(p=0.3)
             
-        self.fc = nn.Linear(math.ceil(input_size/16.0), num_classes)
+        self.fc = nn.Linear(math.ceil(input_size/16.0), 144)
         self.swish5 = nn.SiLU()
         self.fc2 = nn.Linear(num_filters * 8, num_classes)
         self.swish6 = nn.SiLU()
@@ -379,10 +379,10 @@ class Conv1dECG(nn.Module):
         x = self.avg_pooling(x)
         logger.debug(f"shape after avg_pooling: {x.shape}")
 
-        #logger.debug(f"------------FC--------------")
-        #x = self.fc(x)
-        #logger.debug(f"shape after FC: {x.shape}")
-        #x = self.swish5(x)
+        logger.debug(f"------------FC--------------")
+        x = self.fc(x)
+        logger.debug(f"shape after FC: {x.shape}")
+        x = self.swish5(x)
         #x = torch.squeeze(x, dim=2)
         #x = self.fc2(x)
         #logger.debug(f"shape after FC2: {x.shape}")
