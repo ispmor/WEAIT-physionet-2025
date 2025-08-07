@@ -113,6 +113,7 @@ class Block(nn.Module):
             self.dropout_fc4 = nn.Dropout(dropout_rate)
             self.dropout_theta_b_fc = nn.Dropout(dropout_rate)
             self.dropout_theta_f_fc = nn.Dropout(dropout_rate)
+            logger.debug("Created droputs")
         self.backcast_linspace, self.forecast_linspace = linspace(backcast_length, forecast_length)
         self.classes = classes
 
@@ -127,6 +128,7 @@ class Block(nn.Module):
         logger.debug(f"NBeats Block forward - INPUT  shape: {x.shape}")
         x = F.relu(self.fc1(x))
         if self.dropout_rate != 0.0:
+            logger.debug(f"Dropout rate at FC1 in nbeats is: {self.dropout_rate}")
             x = self.drouput_fc1(x)
         logger.debug(f"NBeats Block forward - FC1 output shape: {x.shape}")
         x = F.relu(self.fc2(x))
@@ -426,7 +428,7 @@ class BranchConfig:
 
 
 def get_MultibranchBeats(alpha_config: BranchConfig, beta_config: BranchConfig, gamma_config: BranchConfig, delta_config: BranchConfig, epsilon_config: BranchConfig, classes: list, device, leads) -> MultibranchBeats:
-    dropout_rate = 0.1
+    dropout_rate = 0.2
     alpha_branch = get_single_network(alpha_config.network_name, alpha_config.hidden_size, alpha_config.layers, len(leads), classes, alpha_config.single_peak_length, None, None, alpha_config.beta_input_size, "beta", device, dropout_rate)
     beta_branch = get_single_network(beta_config.network_name, beta_config.hidden_size, beta_config.layers, len(leads), classes, beta_config.single_peak_length, None, None, beta_config.beta_input_size, "beta", device, dropout_rate)
     gamma_branch = get_single_network(gamma_config.network_name, gamma_config.hidden_size, gamma_config.layers, len(leads), classes, gamma_config.single_peak_length, None, None, gamma_config.beta_input_size, "beta", device, dropout_rate)
