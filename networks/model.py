@@ -130,19 +130,19 @@ class Block(nn.Module):
         x = F.relu(self.fc1(x))
         if self.dropout_rate != 0.0:
             logger.debug(f"Dropout rate at FC1 in nbeats is: {self.dropout_rate}")
-            x = self.drouput_fc1(x)
+            x = self.dropout_fc1(x)
         logger.debug(f"NBeats Block forward - FC1 output shape: {x.shape}")
         x = F.relu(self.fc2(x))
         if self.dropout_rate != 0.0:
-            x = self.drouput_fc2(x)
+            x = self.dropout_fc2(x)
         logger.debug(f"NBeats Block forward - FC2 output  shape: {x.shape}")
         x = F.relu(self.fc3(x))
         if self.dropout_rate != 0.0:
-            x = self.drouput_fc3(x)
+            x = self.dropout_fc3(x)
         logger.debug(f"NBeats Block forward - FC3 output  shape: {x.shape}")
         x = F.relu(self.fc4(x))
         if self.dropout_rate != 0.0:
-            x = self.drouput_fc4(x)
+            x = self.dropout_fc4(x)
         logger.debug(f"NBeats Block forward - FC4 output  shape: {x.shape}")
         return x
 
