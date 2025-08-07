@@ -359,8 +359,8 @@ class MultibranchBeats(nn.Module):
         #out = self.modelA(alpha_input)
         #out = self.modelB(beta_input)
         #out = self.modelC(gamma_input)
-        out = self.modelD(delta_input)
-        #joutE = self.modelE(epsilon_input)
+        #out = self.modelD(delta_input)
+        out = self.modelE(epsilon_input)
         #outF = self.modelF(recording_features)
         #logger.debug(f"Alpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}, Epsilon output shape: {outE.shape}, dataset label shape: {recording_features.shape}")
 
@@ -435,8 +435,8 @@ def get_MultibranchBeats(alpha_config: BranchConfig, beta_config: BranchConfig, 
     alpha_branch = None#get_single_network(alpha_config.network_name, alpha_config.hidden_size, alpha_config.layers, len(leads), classes, alpha_config.single_peak_length, None, None, alpha_config.beta_input_size, "beta", device, dropout_rate)
     beta_branch = None#get_single_network(beta_config.network_name, beta_config.hidden_size, beta_config.layers, len(leads), classes, beta_config.single_peak_length, None, None, beta_config.beta_input_size, "beta", device, dropout_rate)
     gamma_branch = None#get_single_network(gamma_config.network_name, gamma_config.hidden_size, gamma_config.layers, len(leads), classes, gamma_config.single_peak_length, None, None, gamma_config.beta_input_size, "beta", device, dropout_rate)
-    delta_branch = get_single_network(delta_config.network_name, delta_config.hidden_size, delta_config.layers, delta_config.channels, classes, delta_config.single_peak_length, None, None, delta_config.beta_input_size, "beta", device, dropout_rate)
-    epsilon_branch = None#get_single_network(epsilon_config.network_name, epsilon_config.hidden_size, epsilon_config.layers, len(leads), classes, epsilon_config.single_peak_length, None, None, epsilon_config.beta_input_size, "beta", device, dropout_rate)
+    delta_branch = None#get_single_network(delta_config.network_name, delta_config.hidden_size, delta_config.layers, delta_config.channels, classes, delta_config.single_peak_length, None, None, delta_config.beta_input_size, "beta", device, dropout_rate)
+    epsilon_branch = get_single_network(epsilon_config.network_name, epsilon_config.hidden_size, epsilon_config.layers, len(leads), classes, epsilon_config.single_peak_length, None, None, epsilon_config.beta_input_size, "beta", device, dropout_rate)
 
     return MultibranchBeats(alpha_branch, beta_branch, gamma_branch, delta_branch, epsilon_branch, classes)
 
