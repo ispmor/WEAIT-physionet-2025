@@ -21,9 +21,9 @@ class ARGS():
         self.fold_to_process = ""
         self.network = "NBEATS"
         self.include_domain = False
-        self.alpha_hidden=11
+        self.alpha_hidden=500
         self.alpha_layers=2
-        self.beta_hidden=11
+        self.beta_hidden=500
         self.beta_layers=2
         self.epochs=50
         self.early_stop=10
