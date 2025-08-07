@@ -42,6 +42,7 @@ class NBeatsNet(nn.Module):
         self.thetas_dim = thetas_dims
         self.device = device
         self.parameters = []
+        self.dropout_rate = dropout_rate
 
         if model_type == 'alpha':
             linear_input_size = input_features_size * input_size
@@ -65,7 +66,7 @@ class NBeatsNet(nn.Module):
             if self.share_weights_in_stack and block_id != 0:
                 block = blocks[-1]  # pick up the last one when we share weights.
             else:
-                block = GenericBlock(self.hidden_layer_units, self.thetas_dim[stack_id], self.input_size, self.target_size, classes=len(self.classes))
+                block = GenericBlock(self.hidden_layer_units, self.thetas_dim[stack_id], self.input_size, self.target_size, classes=len(self.classes), dropout_rate=self.dropout_rate)
                 self.parameters.extend(block.parameters())
             print(f'     | -- {block}')
             blocks.append(block)
@@ -106,7 +107,7 @@ class Block(nn.Module):
         self.fc3 = nn.Linear(units, units)
         self.fc4 = nn.Linear(units, units)
         self.dropout_rate = dropout_rate
-        if self.dropout_rate != 0.0:
+        if dropout_rate != 0.0:
             self.dropout_fc1 = nn.Dropout(dropout_rate)
             self.dropout_fc2 = nn.Dropout(dropout_rate)
             self.dropout_fc3 = nn.Dropout(dropout_rate)
@@ -125,7 +126,6 @@ class Block(nn.Module):
             
 
     def forward(self, x):
-        logger.debug(f"FORWARD droput_rate: {self.dropout_rate}")
         logger.debug(f"NBeats Block forward - INPUT  shape: {x.shape}")
         x = F.relu(self.fc1(x))
         if self.dropout_rate != 0.0:
@@ -162,7 +162,6 @@ class GenericBlock(Block):
         self.forecast_fc = nn.Linear(thetas_dim, backcast_length)  # forecast_length)
 
     def forward(self, x):
-        logger.debug(f"GENERIC FORWARD droput_rate: {self.dropout_rate}")
         logger.debug(f"NBeats Generic Block forward. Input shape: {x.shape}")
         x = super(GenericBlock, self).forward(x)
 
