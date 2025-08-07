@@ -106,7 +106,7 @@ class Block(nn.Module):
         self.fc3 = nn.Linear(units, units)
         self.fc4 = nn.Linear(units, units)
         self.dropout_rate = dropout_rate
-        if dropout_rate != 0.0:
+        if self.dropout_rate != 0.0:
             self.dropout_fc1 = nn.Dropout(dropout_rate)
             self.dropout_fc2 = nn.Dropout(dropout_rate)
             self.dropout_fc3 = nn.Dropout(dropout_rate)
@@ -125,6 +125,7 @@ class Block(nn.Module):
             
 
     def forward(self, x):
+        logger.debug(f"FORWARD droput_rate: {self.dropout_rate}")
         logger.debug(f"NBeats Block forward - INPUT  shape: {x.shape}")
         x = F.relu(self.fc1(x))
         if self.dropout_rate != 0.0:
@@ -156,10 +157,12 @@ class GenericBlock(Block):
 
     def __init__(self, units, thetas_dim, backcast_length=10, forecast_length=5, classes=16, dropout_rate=0.0):
         super(GenericBlock, self).__init__(units, thetas_dim, backcast_length, forecast_length, classes=classes, dropout_rate=dropout_rate)
+        logger.debug(f"At generic block creation droput_rate: {dropout_rate}")
         self.backcast_fc = nn.Linear(thetas_dim, backcast_length)
         self.forecast_fc = nn.Linear(thetas_dim, backcast_length)  # forecast_length)
 
     def forward(self, x):
+        logger.debug(f"GENERIC FORWARD droput_rate: {self.dropout_rate}")
         logger.debug(f"NBeats Generic Block forward. Input shape: {x.shape}")
         x = super(GenericBlock, self).forward(x)
 
