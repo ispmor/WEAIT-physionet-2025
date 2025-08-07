@@ -77,7 +77,7 @@ def train_model(data_folder, model_folder, verbose):
     git_branch = git.Repo(os.getcwd()).active_branch.name
     experiment = git_branch.replace('/','_')
     log_filename =f'logs/{experiment}/{date}/{execution_time.strftime("%H-%M-%S")}.log'
-    tensorboardWriter: SummaryWriter = SummaryWriter(f"runs/{experiment}")
+    tensorboardWriter: SummaryWriter = SummaryWriter(f"runs/{experiment}-{execution_time.strftime('%H-%M-%S')}")
     os.makedirs(os.path.dirname(log_filename), exist_ok=True)
     logging_level = logging.INFO
     if debug_mode:
