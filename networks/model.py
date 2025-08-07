@@ -357,8 +357,8 @@ class MultibranchBeats(nn.Module):
         logger.debug(f"Dataset label: {recording_features.shape}")
 
         #out = self.modelA(alpha_input)
-        out = self.modelB(beta_input)
-        #outC = self.modelC(gamma_input)
+        #out = self.modelB(beta_input)
+        out = self.modelC(gamma_input)
         #outD = self.modelD(delta_input)
         #joutE = self.modelE(epsilon_input)
         #outF = self.modelF(recording_features)
@@ -433,8 +433,8 @@ class BranchConfig:
 def get_MultibranchBeats(alpha_config: BranchConfig, beta_config: BranchConfig, gamma_config: BranchConfig, delta_config: BranchConfig, epsilon_config: BranchConfig, classes: list, device, leads) -> MultibranchBeats:
     dropout_rate = 0.4
     alpha_branch = None#get_single_network(alpha_config.network_name, alpha_config.hidden_size, alpha_config.layers, len(leads), classes, alpha_config.single_peak_length, None, None, alpha_config.beta_input_size, "beta", device, dropout_rate)
-    beta_branch = get_single_network(beta_config.network_name, beta_config.hidden_size, beta_config.layers, len(leads), classes, beta_config.single_peak_length, None, None, beta_config.beta_input_size, "beta", device, dropout_rate)
-    gamma_branch = None#get_single_network(gamma_config.network_name, gamma_config.hidden_size, gamma_config.layers, len(leads), classes, gamma_config.single_peak_length, None, None, gamma_config.beta_input_size, "beta", device, dropout_rate)
+    beta_branch = None#get_single_network(beta_config.network_name, beta_config.hidden_size, beta_config.layers, len(leads), classes, beta_config.single_peak_length, None, None, beta_config.beta_input_size, "beta", device, dropout_rate)
+    gamma_branch = get_single_network(gamma_config.network_name, gamma_config.hidden_size, gamma_config.layers, len(leads), classes, gamma_config.single_peak_length, None, None, gamma_config.beta_input_size, "beta", device, dropout_rate)
     delta_branch = None#get_single_network(delta_config.network_name, delta_config.hidden_size, delta_config.layers, delta_config.channels, classes, delta_config.single_peak_length, None, None, delta_config.beta_input_size, "beta", device, dropout_rate)
     epsilon_branch = None#get_single_network(epsilon_config.network_name, epsilon_config.hidden_size, epsilon_config.layers, len(leads), classes, epsilon_config.single_peak_length, None, None, epsilon_config.beta_input_size, "beta", device, dropout_rate)
 
