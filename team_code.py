@@ -158,7 +158,7 @@ def train_model(data_folder, model_folder, verbose):
     logger.info("Loaded validation dataset")
 
     model = get_MultibranchBeats(alpha_config, beta_config, gamma_config, delta_config, epsilon_config, utilityFunctions.all_classes,device, leads=list(leads))
-    training_config = TrainingConfig(batch_size=100,
+    training_config = TrainingConfig(batch_size=200,
                                     n_epochs_stop=early_stop,
                                     num_epochs=epochs,
                                     lr_rate=0.001,
@@ -168,8 +168,8 @@ def train_model(data_folder, model_folder, verbose):
                                     model_repository=model_folder
                                     )
 
-    training_data_loader = torch_data.DataLoader(training_dataset, batch_size=500, shuffle=True, num_workers=6)
-    test_data_loader = torch_data.DataLoader(test_dataset, batch_size=500, shuffle=True, num_workers=6)
+    training_data_loader = torch_data.DataLoader(training_dataset, batch_size=200, shuffle=True, num_workers=6)
+    test_data_loader = torch_data.DataLoader(test_dataset, batch_size=200, shuffle=True, num_workers=6)
     networkTrainer=NetworkTrainer(utilityFunctions.all_classes, training_config, tensorboardWriter, model_name_prefix=experiment)
     trained_model_name= networkTrainer.train(model, alpha_config, beta_config, training_data_loader,  test_data_loader, leads)
 
