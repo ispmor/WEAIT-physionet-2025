@@ -16,7 +16,7 @@ class ARGS():
         self.delta_input_size=10668
         self.epsilon_input_size=1500
         self.zeta_input_size=1500
-        self.debug_mode = True
+        self.debug_mode = False
         self.remove_baseline = False
         self.fold_to_process = ""
         self.network = "NBEATS"
