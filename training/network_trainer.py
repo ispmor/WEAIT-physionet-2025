@@ -10,12 +10,12 @@ logger = logging.getLogger(__name__)
 
 
 class TrainingConfig:
-    batch_size = -1
-    n_epochs_stop = -1
-    num_epochs = -1
-    lr_rate = 0.01
-    criterion = None
-    optimizer = None
+    batch_size:int
+    n_epochs_stop:int
+    num_epochs: int
+    lr_rate:int
+    criterion: torch.nn.BCEWithLogitsLoss
+    optimizer: torch.optim.Optimizer
     device=None
     model_repository: str = ""
     def __init__(self, batch_size, n_epochs_stop, num_epochs, lr_rate, criterion, optimizer, device, model_repository):
@@ -34,8 +34,10 @@ class TrainingConfig:
 class NetworkTrainer:
     min_val_loss = 999
     selected_classe = []
-    training_config: TrainingConfig = None
-    def __init__(self, selected_classes: list, training_config: TrainingConfig, tensorboardWriter: SummaryWriter) -> None:
+    training_config: TrainingConfig
+    model_name_prefix: str 
+    def __init__(self, selected_classes: list, training_config: TrainingConfig, tensorboardWriter: SummaryWriter, model_name_prefix:str) -> None:
+        self.model_name_prefix = model_name_prefix
         self.selected_classe=selected_classes
         self.training_config = training_config
         self.tensorboardWriter = tensorboardWriter
@@ -85,7 +87,7 @@ class NetworkTrainer:
 
 
     def train(self, blendModel, alpha_config, beta_config, training_data_loader, validation_data_loader, leads):
-        model_name = os.path.join(self.training_config.model_repository, "best_model_physionet2025.th")
+        model_name = os.path.join(self.training_config.model_repository, f"{self.model_name_prefix}_best_model_physionet2025.th")
         epochs_no_improve=0
         min_val_loss=999999
 

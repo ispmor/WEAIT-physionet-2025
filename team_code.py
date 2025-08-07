@@ -24,6 +24,7 @@ from torch.utils import data as torch_data
 from training import *
 from torch.nn import BCEWithLogitsLoss
 import torch
+import git
 
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,9 @@ def train_model(data_folder, model_folder, verbose):
     date = execution_time.date()
     time = execution_time.time()
     log_filename =f'logs/{name}/{date}/{time}.log'
-    tensorboardWriter: SummaryWriter = SummaryWriter(f"runs/physionet-2025")
+    git_branch = git.Repo(os.getcwd()).active_branch.name
+    experiment = git_branch.replace('/','_')
+    tensorboardWriter: SummaryWriter = SummaryWriter(f"runs/{experiment}")
     os.makedirs(os.path.dirname(log_filename), exist_ok=True)
     logging_level = logging.INFO
     if debug_mode:
@@ -84,7 +87,7 @@ def train_model(data_folder, model_folder, verbose):
                       level=logging_level,
                       format='[%(asctime)s %(levelname)-8s %(filename)s:%(lineno)s]  %(message)s',
                       datefmt='%Y-%m-%d %H:%M:%S')
-    logger.info(f"!!! Experiment: {name} !!!")
+    logger.info(f"!!! Experiment: {experiment} !!!")
 
     utilityFunctions = UtilityFunctions(device, datasets_dir=datasets_target_dir, rr_features_size=gamma_input_size, window_size=window_size, wavelet_features_size=wavelet_features_size)
 
@@ -155,19 +158,19 @@ def train_model(data_folder, model_folder, verbose):
     logger.info("Loaded validation dataset")
 
     model = get_MultibranchBeats(alpha_config, beta_config, gamma_config, delta_config, epsilon_config, utilityFunctions.all_classes,device, leads=list(leads))
-    training_config = TrainingConfig(batch_size=500,
+    training_config = TrainingConfig(batch_size=100,
                                     n_epochs_stop=early_stop,
                                     num_epochs=epochs,
-                                    lr_rate=0.01,
+                                    lr_rate=0.001,
                                     criterion=BCEWithLogitsLoss(pos_weight=weights),
-                                    optimizer=torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.01),
+                                    optimizer=torch.optim.Adam(model.parameters(), lr=0.001),
                                     device=device,
                                     model_repository=model_folder
                                     )
 
     training_data_loader = torch_data.DataLoader(training_dataset, batch_size=500, shuffle=True, num_workers=6)
     test_data_loader = torch_data.DataLoader(test_dataset, batch_size=500, shuffle=True, num_workers=6)
-    networkTrainer=NetworkTrainer(utilityFunctions.all_classes, training_config, tensorboardWriter)
+    networkTrainer=NetworkTrainer(utilityFunctions.all_classes, training_config, tensorboardWriter, model_name_prefix=experiment)
     trained_model_name= networkTrainer.train(model, alpha_config, beta_config, training_data_loader,  test_data_loader, leads)
 
     if verbose:
@@ -177,7 +180,10 @@ def train_model(data_folder, model_folder, verbose):
 # Load your trained models. This function is *required*. You should edit this function to add your code, but do *not* change the
 # arguments of this function. If you do not train one of the models, then you can return None for the model.
 def load_model(model_folder, verbose):
-    checkpoint = torch.load(os.path.join(model_folder, "best_model_physionet2025.th"), map_location=torch.device(device))
+    git_branch = git.Repo(os.getcwd()).active_branch.name
+    experiment = git_branch.replace('/','_')
+
+    checkpoint = torch.load(os.path.join(model_folder, f"{experiment}_best_model_physionet2025.th"), map_location=torch.device(device))
     model = get_MultibranchBeats(alpha_config, beta_config, gamma_config,
                                  delta_config, epsilon_config, 
                                  ['True'],device, leads=leads)

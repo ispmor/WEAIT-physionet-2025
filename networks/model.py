@@ -26,7 +26,8 @@ class NBeatsNet(nn.Module):
                  device=None,
                  classes=[],
                  model_type='alpha',
-                 input_features_size=363):
+                 input_features_size=363,
+                 dropout_rate=0.0):
         super(NBeatsNet, self).__init__()
         self.classes = classes
         self.leads = []
@@ -93,7 +94,7 @@ def linspace(backcast_length, forecast_length):
 
 
 class Block(nn.Module):
-    def __init__(self, units, thetas_dim, backcast_length=10, forecast_length=5, share_thetas=False, classes=16):
+    def __init__(self, units, thetas_dim, backcast_length=10, forecast_length=5, share_thetas=False, classes=1, dropout_rate: float=0.0):
         super(Block, self).__init__()
         self.units = units
         self.thetas_dim = thetas_dim
@@ -104,6 +105,14 @@ class Block(nn.Module):
         self.fc2 = nn.Linear(units, units)
         self.fc3 = nn.Linear(units, units)
         self.fc4 = nn.Linear(units, units)
+        self.dropout_rate = dropout_rate
+        if dropout_rate != 0.0:
+            self.dropout_fc1 = nn.Dropout(dropout_rate)
+            self.dropout_fc2 = nn.Dropout(dropout_rate)
+            self.dropout_fc3 = nn.Dropout(dropout_rate)
+            self.dropout_fc4 = nn.Dropout(dropout_rate)
+            self.dropout_theta_b_fc = nn.Dropout(dropout_rate)
+            self.dropout_theta_f_fc = nn.Dropout(dropout_rate)
         self.backcast_linspace, self.forecast_linspace = linspace(backcast_length, forecast_length)
         self.classes = classes
 
@@ -112,16 +121,25 @@ class Block(nn.Module):
         else:
             self.theta_b_fc = nn.Linear(units, thetas_dim)
             self.theta_f_fc = nn.Linear(units, thetas_dim)
+            
 
     def forward(self, x):
         logger.debug(f"NBeats Block forward - INPUT  shape: {x.shape}")
         x = F.relu(self.fc1(x))
+        if self.dropout_rate != 0.0:
+            x = self.drouput_fc1(x)
         logger.debug(f"NBeats Block forward - FC1 output shape: {x.shape}")
         x = F.relu(self.fc2(x))
+        if self.dropout_rate != 0.0:
+            x = self.drouput_fc2(x)
         logger.debug(f"NBeats Block forward - FC2 output  shape: {x.shape}")
         x = F.relu(self.fc3(x))
+        if self.dropout_rate != 0.0:
+            x = self.drouput_fc3(x)
         logger.debug(f"NBeats Block forward - FC3 output  shape: {x.shape}")
         x = F.relu(self.fc4(x))
+        if self.dropout_rate != 0.0:
+            x = self.drouput_fc4(x)
         logger.debug(f"NBeats Block forward - FC4 output  shape: {x.shape}")
         return x
 
@@ -134,9 +152,8 @@ class Block(nn.Module):
 
 class GenericBlock(Block):
 
-    def __init__(self, units, thetas_dim, backcast_length=10, forecast_length=5, classes=16):
-        super(GenericBlock, self).__init__(units, thetas_dim, backcast_length, forecast_length, classes=classes)
-
+    def __init__(self, units, thetas_dim, backcast_length=10, forecast_length=5, classes=16, dropout_rate=0.0):
+        super(GenericBlock, self).__init__(units, thetas_dim, backcast_length, forecast_length, classes=classes, dropout_rate=dropout_rate)
         self.backcast_fc = nn.Linear(thetas_dim, backcast_length)
         self.forecast_fc = nn.Linear(thetas_dim, backcast_length)  # forecast_length)
 
@@ -146,6 +163,10 @@ class GenericBlock(Block):
 
         theta_b = F.relu(self.theta_b_fc(x))
         theta_f = F.relu(self.theta_f_fc(x))  # tutaj masz thetas_dim rozmiar
+        if self.dropout_rate != 0.0:
+            theta_b = self.dropout_theta_b_fc(theta_b)
+            theta_f = self.dropout_theta_f_fc(theta_f)
+
 
         backcast = self.backcast_fc(theta_b)  # generic. 3.3.
         forecast = self.forecast_fc(theta_f)  # generic. 3.3.
@@ -165,7 +186,8 @@ class Nbeats_beta(nn.Module):
                  device,
                  classes=[],
                  model_type='beta',
-                 input_features_size_b=360):
+                 input_features_size_b=360,
+                 dropout_rate=0.0):
         super(Nbeats_beta, self).__init__()
 
         self.num_classes = num_classes  # number of classes
@@ -193,12 +215,12 @@ class Nbeats_beta(nn.Module):
                                      device=self.device,
                                      classes=self.classes,
                                      hidden_layer_units=self.hidden_size,
-                                     input_features_size=input_features_size_b)
+                                     input_features_size=input_features_size_b,
+                                     dropout_rate=dropout_rate)
 
         self.fc = nn.Linear( input_features_size_b * self.input_size,
                             num_classes)  # hidden_size, 128)  # fully connected 1# fully connected last layer
-        self.dropoutNBEATS = nn.Dropout(0.5)
-        self.dropoutFC = nn.Dropout(0.5)
+        self.dropoutNBEATS = nn.Dropout(dropout_rate)
         logger.debug(f"{self}")
 
 
@@ -213,7 +235,6 @@ class Nbeats_beta(nn.Module):
         tmp = torch.flatten(output_beta, start_dim=1)
         out = self.relu(tmp)  # relu
         out = self.fc(out)  # Final Output
-        out = self.dropoutFC(out)
         return out
 
 
@@ -345,7 +366,7 @@ class MultibranchBeats(nn.Module):
         return out
 
 
-def get_single_network(network, hs, layers, leads, selected_classes, single_peak_length,a1_in, a2_in, b_in, as_branch, device):
+def get_single_network(network, hs, layers, leads, selected_classes, single_peak_length,a1_in, a2_in, b_in, as_branch, device, dropout_rate=0.0):
     torch.manual_seed(17)
 
     if network == "LSTM":
@@ -373,19 +394,7 @@ def get_single_network(network, hs, layers, leads, selected_classes, single_peak
 
 
     if network == "NBEATS":
-        if as_branch == "alpha":
-            return Nbeats_alpha(input_size=leads,
-                        num_classes=len(selected_classes),
-                        hidden_size=hs,
-                        num_layers=layers,
-                        seq_length=single_peak_length,
-                        device=device,
-                        model_type=as_branch,
-                        classes=selected_classes,
-                        input_features_size_a1=a1_in,
-                        input_features_size_a2=a2_in)
-        else:
-            return Nbeats_beta(input_size=leads,
+        return Nbeats_beta(input_size=leads,
                             num_classes=len(selected_classes),
                             hidden_size=hs,
                             seq_length=single_peak_length,
@@ -393,7 +402,8 @@ def get_single_network(network, hs, layers, leads, selected_classes, single_peak
                             model_type=as_branch,
                             classes=selected_classes,
                             num_layers=layers,
-                            input_features_size_b=b_in)
+                            input_features_size_b=b_in,
+                           dropout_rate=dropout_rate)
 
 
 class BranchConfig:
@@ -416,11 +426,12 @@ class BranchConfig:
 
 
 def get_MultibranchBeats(alpha_config: BranchConfig, beta_config: BranchConfig, gamma_config: BranchConfig, delta_config: BranchConfig, epsilon_config: BranchConfig, classes: list, device, leads) -> MultibranchBeats:
-    alpha_branch = get_single_network(alpha_config.network_name, alpha_config.hidden_size, alpha_config.layers, len(leads), classes, alpha_config.single_peak_length, None, None, alpha_config.beta_input_size, "beta", device)
-    beta_branch = get_single_network(beta_config.network_name, beta_config.hidden_size, beta_config.layers, len(leads), classes, beta_config.single_peak_length, None, None, beta_config.beta_input_size, "beta", device)
-    gamma_branch = get_single_network(gamma_config.network_name, gamma_config.hidden_size, gamma_config.layers, len(leads), classes, gamma_config.single_peak_length, None, None, gamma_config.beta_input_size, "beta", device)
-    delta_branch = get_single_network(delta_config.network_name, delta_config.hidden_size, delta_config.layers, delta_config.channels, classes, delta_config.single_peak_length, None, None, delta_config.beta_input_size, "beta", device)
-    epsilon_branch = get_single_network(epsilon_config.network_name, epsilon_config.hidden_size, epsilon_config.layers, len(leads), classes, epsilon_config.single_peak_length, None, None, epsilon_config.beta_input_size, "beta", device)
+    dropout_rate = 0.0
+    alpha_branch = get_single_network(alpha_config.network_name, alpha_config.hidden_size, alpha_config.layers, len(leads), classes, alpha_config.single_peak_length, None, None, alpha_config.beta_input_size, "beta", device, dropout_rate)
+    beta_branch = get_single_network(beta_config.network_name, beta_config.hidden_size, beta_config.layers, len(leads), classes, beta_config.single_peak_length, None, None, beta_config.beta_input_size, "beta", device, dropout_rate)
+    gamma_branch = get_single_network(gamma_config.network_name, gamma_config.hidden_size, gamma_config.layers, len(leads), classes, gamma_config.single_peak_length, None, None, gamma_config.beta_input_size, "beta", device, dropout_rate)
+    delta_branch = get_single_network(delta_config.network_name, delta_config.hidden_size, delta_config.layers, delta_config.channels, classes, delta_config.single_peak_length, None, None, delta_config.beta_input_size, "beta", device, dropout_rate)
+    epsilon_branch = get_single_network(epsilon_config.network_name, epsilon_config.hidden_size, epsilon_config.layers, len(leads), classes, epsilon_config.single_peak_length, None, None, epsilon_config.beta_input_size, "beta", device, dropout_rate)
 
     return MultibranchBeats(alpha_branch, beta_branch, gamma_branch, delta_branch, epsilon_branch, classes)
 
