@@ -128,7 +128,7 @@ def train_model(data_folder, model_folder, verbose):
                 if random.random() > 0.05:
                     continue
             else:
-                if random.random() > 0.1:
+                if random.random() > 0.08:
                     continue
 
         
