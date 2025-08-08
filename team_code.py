@@ -128,7 +128,7 @@ def train_model(data_folder, model_folder, verbose):
                 if random.random() > 0.05:
                     continue
             else:
-                if random.random() > 0.1:
+                if random.random() > 0.08:
                     continue
 
         
@@ -159,11 +159,13 @@ def train_model(data_folder, model_folder, verbose):
 
     model = get_MultibranchBeats(alpha_config, beta_config, gamma_config, delta_config, epsilon_config, utilityFunctions.all_classes,device, leads=list(leads))
     training_config = TrainingConfig(batch_size=200,
+
                                     n_epochs_stop=early_stop,
                                     num_epochs=epochs,
                                     lr_rate=0.001,
                                     criterion=BCEWithLogitsLoss(pos_weight=weights),
                                     optimizer=torch.optim.Adam(model.parameters(), lr=0.001),
+
                                     device=device,
                                     model_repository=model_folder
                                     )
@@ -171,6 +173,7 @@ def train_model(data_folder, model_folder, verbose):
     training_data_loader = torch_data.DataLoader(training_dataset, batch_size=200, shuffle=True, num_workers=6)
     test_data_loader = torch_data.DataLoader(test_dataset, batch_size=200, shuffle=True, num_workers=6)
     networkTrainer=NetworkTrainer(utilityFunctions.all_classes, training_config, tensorboardWriter, model_name_prefix=experiment)
+
     trained_model_name= networkTrainer.train(model, alpha_config, beta_config, training_data_loader,  test_data_loader, leads)
 
     if verbose:
