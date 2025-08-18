@@ -437,12 +437,12 @@ class MultibranchBeats(nn.Module):
         logger.debug(f"Alpha input shape: {alpha_input.shape}\nBeta input shape: {beta_input.shape}\nGamma input shape: {gamma_input.shape}\nDelta input shape: {delta_input.shape}")
         logger.debug(f"Dataset label: {recording_features.shape}")
 
-        outA = self.modelA(alpha_input)
+        #outA = self.modelA(alpha_input)
         outB = self.modelB(beta_input)
-        outC = self.modelC(gamma_input)
-        outD = self.modelD(delta_input)
-        outE = self.modelE(epsilon_input)
-        outF = self.modelF(recording_features)
+        #outC = self.modelC(gamma_input)
+        #outD = self.modelD(delta_input)
+        #outE = self.modelE(epsilon_input)
+        #outF = self.modelF(recording_features)
 
         #logger.debug(f"Alpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}, Epsilon output shape: {outE.shape}, dataset label shape: {recording_features.shape}")
 
@@ -453,9 +453,9 @@ class MultibranchBeats(nn.Module):
         #outE = torch.squeeze(outE, dim=2)
         #logger.debug(f"-------- AFTER SQUEEZE ---- \nAlpha output shape: {outA.shape}\nBeta output shape: {outB.shape}\nGamma output shape: {outC.shape}\nDelta output shape: {outD.shape}\nEpsilon output shape: {outE.shape}\n Zeta shape: {outF.shape}")
 
-        out_concat = F.relu(torch.cat((outA, outB, outC, outD, outE, outF), dim=1))
-        out = self.linear(out_concat)
-        out = F.relu(out)
+        #out_concat = F.relu(torch.cat((outA, outB, outC, outD, outE, outF), dim=1))
+        #out = self.linear(out_concat)
+        out = F.relu(outB)
         return out
 
 
@@ -529,11 +529,11 @@ class BranchConfig:
 
 def get_MultibranchBeats(alpha_config: BranchConfig, beta_config: BranchConfig, gamma_config: BranchConfig, delta_config: BranchConfig, epsilon_config: BranchConfig, classes: list, device, leads) -> MultibranchBeats:
     dropout_rate = 0.4
-    alpha_branch = get_single_network(alpha_config.network_name, alpha_config.hidden_size, alpha_config.layers, len(leads), classes, alpha_config.single_peak_length, None, None, alpha_config.beta_input_size, "beta", device, dropout_rate)
+    alpha_branch = None #get_single_network(alpha_config.network_name, alpha_config.hidden_size, alpha_config.layers, len(leads), classes, alpha_config.single_peak_length, None, None, alpha_config.beta_input_size, "beta", device, dropout_rate)
     beta_branch = get_single_network(beta_config.network_name, beta_config.hidden_size, beta_config.layers, len(leads), classes, beta_config.single_peak_length, None, None, beta_config.beta_input_size, "beta", device, dropout_rate)
-    gamma_branch = get_single_network(gamma_config.network_name, gamma_config.hidden_size, gamma_config.layers, len(leads), classes, gamma_config.single_peak_length, None, None, gamma_config.beta_input_size, "beta", device, dropout_rate)
-    delta_branch = get_single_network(delta_config.network_name, delta_config.hidden_size, delta_config.layers, delta_config.channels, classes, delta_config.single_peak_length, None, None, delta_config.beta_input_size, "beta", device, dropout_rate)
-    epsilon_branch = get_single_network(epsilon_config.network_name, epsilon_config.hidden_size, epsilon_config.layers, len(leads), classes, epsilon_config.single_peak_length, None, None, epsilon_config.beta_input_size, "beta", device, dropout_rate)
+    gamma_branch = None #get_single_network(gamma_config.network_name, gamma_config.hidden_size, gamma_config.layers, len(leads), classes, gamma_config.single_peak_length, None, None, gamma_config.beta_input_size, "beta", device, dropout_rate)
+    delta_branch = None #get_single_network(delta_config.network_name, delta_config.hidden_size, delta_config.layers, delta_config.channels, classes, delta_config.single_peak_length, None, None, delta_config.beta_input_size, "beta", device, dropout_rate)
+    epsilon_branch = None #get_single_network(epsilon_config.network_name, epsilon_config.hidden_size, epsilon_config.layers, len(leads), classes, epsilon_config.single_peak_length, None, None, epsilon_config.beta_input_size, "beta", device, dropout_rate)
 
 
 
