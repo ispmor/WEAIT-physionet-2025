@@ -239,12 +239,15 @@ class UtilityFunctions:
         # Extract the sex from the record and represent it as a one-hot encoded vector.
         sex = get_sex(header)
         sex_one_hot_encoding = np.zeros(3, dtype=bool)
-        if sex.casefold().startswith('f'):
-            sex_one_hot_encoding[0] = 1
-        elif sex.casefold().startswith('m'):
-            sex_one_hot_encoding[1] = 1
-        else:
+        if sex is None:
             sex_one_hot_encoding[2] = 1
+        else:
+            if sex.casefold().startswith('f'):
+                sex_one_hot_encoding[0] = 1
+            elif sex.casefold().startswith('m'):
+                sex_one_hot_encoding[1] = 1
+            else:
+                sex_one_hot_encoding[2] = 1
 
         # Extract the source from the record (but do not use it as a feature).
         source = get_source(header)
