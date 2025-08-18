@@ -320,7 +320,7 @@ class UtilityFunctions:
             try:
                 current_label= get_label(header)
             except Exception as e:
-                print("Failed to load label, assigning 0")
+                logger.debug("Failed to load label, assigning 0")
                 current_label = 0
 
             try:
@@ -366,9 +366,6 @@ class UtilityFunctions:
             
             new_windows = recording_raw.shape[0]
             recording_features_repeated = np.repeat([recording_features_record], new_windows, axis=0)
-            logger.info(f"What is the recording feature record: {recording_features_record}")
-            logger.info(f"recording_features_record original shape: {recording_features_record.shape}")
-            logger.info(f"Recording features repeated shape: {recording_features_repeated.shape}")
             
             if new_windows == 0:
                 logger.debug("New windows is 0! SKIPPING")
@@ -384,9 +381,7 @@ class UtilityFunctions:
             dset[-new_windows:] = recording_raw
             lset.resize(lset.shape[0] + new_windows, axis=0)
             lset[-new_windows:] = label_pack
-            logger.info(f"recording_features size before resize: {recording_features.shape}")
             recording_features.resize(recording_features.shape[0] + new_windows, axis=0)
-            logger.info(f"recording_features size after resize: {recording_features.shape}")
             recording_features[-new_windows:] = recording_features_repeated
             rrset.resize(rrset.shape[0] + new_windows, axis=0)
             rrset[-new_windows:] = rr_features
