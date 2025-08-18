@@ -120,10 +120,13 @@ class UtilityFunctions:
         coeffs = []
         peaks_considered = []
         recording_length=len(drift_removed_recording[0])
-        for peak in range(0, recording_length, self.window_size):
+        # THIS SHOULD BE FIXED TO ITERATE OVER PEAKS!
+        for peak in peaks:
+            if peak - 400 <  0:
+                continue
             if peak + self.window_size < recording_length:
-                signal_local = drift_removed_recording[:, peak: peak + self.window_size]
-                signal_local_raw = recording[:, peak: peak + self.window_size]
+                signal_local = drift_removed_recording[:, peak-400: peak + self.window_size-400]
+                signal_local_raw = recording[:, peak-400: peak + self.window_size-400]
                 wavelet_features = self.get_wavelet_features(signal_local, 'db2')
                 peaks_considered.extend([p for p in peaks if peak <= p < peak+self.window_size])
             else:
