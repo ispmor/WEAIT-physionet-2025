@@ -134,7 +134,7 @@ def train_model(data_folder, model_folder, verbose):
                 if random.random() > code_threshold:
                     continue
             else:
-                if random.random() > 0.08:
+                if random.random() > 0.05:
                     continue
 
         
@@ -165,7 +165,6 @@ def train_model(data_folder, model_folder, verbose):
 
     model = get_MultibranchBeats(alpha_config, beta_config, gamma_config, delta_config, epsilon_config, utilityFunctions.all_classes,device, leads=list(leads))
     training_config = TrainingConfig(batch_size=batch_size,
-
                                     n_epochs_stop=early_stop,
                                     num_epochs=epochs,
                                     lr_rate=0.001,
@@ -176,22 +175,22 @@ def train_model(data_folder, model_folder, verbose):
                                     model_repository=model_folder
                                     )
 
-    training_dataset.open_hdf5()
-    test_dataset.open_hdf5()
+    #training_dataset.open_hdf5()
+    #test_dataset.open_hdf5()
 
-    labels_training = [training_dataset[i][2][0] for i in range(len(training_dataset))] 
-    labels_test = [test_dataset[i][2][0] for i in range(len(test_dataset))] 
-    sampler_training = GuaranteePositiveBatchSampler(labels_training, batch_size, drop_last=True)
-    sampler_test = GuaranteePositiveBatchSampler(labels_test, batch_size, drop_last=True)
+    #labels_training = [training_dataset[i][2][0] for i in range(len(training_dataset))] 
+    #labels_test = [test_dataset[i][2][0] for i in range(len(test_dataset))] 
+    #sampler_training = GuaranteePositiveBatchSampler(labels_training, batch_size, drop_last=True)
+    #sampler_test = GuaranteePositiveBatchSampler(labels_test, batch_size, drop_last=True)
 
-    del training_dataset, test_dataset
+    #del training_dataset, test_dataset
 
-    training_dataset = HDF5Dataset('./' + utilityFunctions.training_filename, recursive=False, load_data=False, data_cache_size=4, transform=None, leads=leads_idx)
-    test_dataset = HDF5Dataset('./' + utilityFunctions.test_filename, recursive=False, load_data=False, data_cache_size=4, transform=None, leads=leads_idx)
+    #training_dataset = HDF5Dataset('./' + utilityFunctions.training_filename, recursive=False, load_data=False, data_cache_size=4, transform=None, leads=leads_idx)
+    #test_dataset = HDF5Dataset('./' + utilityFunctions.test_filename, recursive=False, load_data=False, data_cache_size=4, transform=None, leads=leads_idx)
 
 
-    training_data_loader = torch_data.DataLoader(training_dataset, batch_sampler=sampler_training, num_workers=6)
-    test_data_loader = torch_data.DataLoader(test_dataset, batch_sampler=sampler_test, num_workers=6)
+    training_data_loader = torch_data.DataLoader(training_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
+    test_data_loader = torch_data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
     networkTrainer=NetworkTrainer(utilityFunctions.all_classes, training_config, tensorboardWriter, model_name_prefix=experiment)
 
     trained_model_name= networkTrainer.train(model, alpha_config, beta_config, training_data_loader,  test_data_loader, leads)

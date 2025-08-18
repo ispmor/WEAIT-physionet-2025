@@ -4,7 +4,7 @@ import random
 from itertools import cycle
 
 class GuaranteePositiveBatchSampler(Sampler):
-    def __init__(self, labels, batch_size, min_positives=5, drop_last=True, seed=None):
+    def __init__(self, labels, batch_size, min_positives=10, drop_last=True, seed=None):
         self.labels = list(labels)                   # 0/1 per sample (len == len(dataset))
         self.batch_size = batch_size
         self.drop_last = drop_last
