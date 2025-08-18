@@ -8,6 +8,7 @@ class ARGS():
         self.gpu = 0
         self.model = "/home/models/"
         self.clean = False
+        self.batch_size = 190
         self.window_size=1500
         self.wavelet_features_size=759
         self.alpha_input_size=1500
@@ -29,6 +30,8 @@ class ARGS():
         self.early_stop=10
         self.fold = 1
         self.leads = "12"
-        self.name = f"{self.network}_{self.leads}_{datetime.today().strftime('%Y-%m-%d')}"
+        self.name = f"{self.network}_fixed_windows_{self.leads}_{datetime.today().strftime('%Y-%m-%d')}"
+        self.git = False
+        self.code_threshold = 0.05 #for submission it should be 0.05
 
 

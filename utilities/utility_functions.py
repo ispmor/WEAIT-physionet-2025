@@ -120,12 +120,18 @@ class UtilityFunctions:
         coeffs = []
         peaks_considered = []
         recording_length=len(drift_removed_recording[0])
-        for peak in range(0, recording_length, self.window_size):
+        # THIS SHOULD BE FIXED TO ITERATE OVER PEAKS!
+        saved_peaks = []
+        for peak in peaks:
+            if peak - 400 <  0:
+                continue
             if peak + self.window_size < recording_length:
-                signal_local = drift_removed_recording[:, peak: peak + self.window_size]
-                signal_local_raw = recording[:, peak: peak + self.window_size]
+                signal_local = drift_removed_recording[:, peak-400: peak + self.window_size-400]
+                signal_local_raw = recording[:, peak-400: peak + self.window_size-400]
                 wavelet_features = self.get_wavelet_features(signal_local, 'db2')
-                peaks_considered.extend([p for p in peaks if peak <= p < peak+self.window_size])
+                peaks_considered.extend([p for p in peaks if peak <= p < peak+self.window_size - 400])
+                saved_peaks.append(peak)
+
             else:
                 logger.debug(f"Skipping append as peak = {peak}")
                 continue
@@ -142,10 +148,9 @@ class UtilityFunctions:
 
         rr_features = np.zeros((x_drift_removed.shape[0], drift_removed_recording.shape[0], self.rr_features_size), dtype=np.float64)
         counter = 0 
-        for peak in range(0, recording_length-self.window_size, self.window_size):
-
+        for peak in saved_peaks:
             try:
-                domain_knowledge_analysis = analyse_recording(drift_removed_recording, signals, infos, rates,leads_idxs_dict[len(leads)], window=(peak, peak+self.window_size), pantompkins_peaks=peaks_considered)
+                domain_knowledge_analysis = analyse_recording(drift_removed_recording, signals, infos, rates,leads_idxs_dict[len(leads)], window=(peak-400, peak+self.window_size-400), pantompkins_peaks=peaks_considered)
                 logger.debug(f"{domain_knowledge_analysis}")
                 rr_features[counter] = analysis_dict_to_array(domain_knowledge_analysis, leads_idxs_dict[len(leads)])
                 counter += 1
@@ -229,17 +234,23 @@ class UtilityFunctions:
 
         # Extract the age from the record.
         age = get_age(header)
-        age = np.array([age])
+        if age is None:
+            age = np.array([-1])
+        else:
+            age = np.array([age])
 
         # Extract the sex from the record and represent it as a one-hot encoded vector.
         sex = get_sex(header)
         sex_one_hot_encoding = np.zeros(3, dtype=bool)
-        if sex.casefold().startswith('f'):
-            sex_one_hot_encoding[0] = 1
-        elif sex.casefold().startswith('m'):
-            sex_one_hot_encoding[1] = 1
-        else:
+        if sex is None:
             sex_one_hot_encoding[2] = 1
+        else:
+            if sex.casefold().startswith('f'):
+                sex_one_hot_encoding[0] = 1
+            elif sex.casefold().startswith('m'):
+                sex_one_hot_encoding[1] = 1
+            else:
+                sex_one_hot_encoding[2] = 1
 
         # Extract the source from the record (but do not use it as a feature).
         source = get_source(header)
@@ -309,7 +320,7 @@ class UtilityFunctions:
             try:
                 current_label= get_label(header)
             except Exception as e:
-                print("Failed to load label, assigning 0")
+                logger.debug("Failed to load label, assigning 0")
                 current_label = 0
 
             try:

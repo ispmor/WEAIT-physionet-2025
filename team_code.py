@@ -24,6 +24,7 @@ from torch.utils import data as torch_data
 from training import *
 from torch.nn import BCEWithLogitsLoss
 import torch
+
 #import git
 
 
@@ -57,9 +58,16 @@ gamma_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_siz
 delta_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, beta_input_size=delta_input_size, channels=1)
 epsilon_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, window_size, wavelet_features_size, beta_input_size=epsilon_input_size)
 zeta_config = BranchConfig(network_name, alpha_hidden, alpha_layers, window_size, window_size, wavelet_features_size, beta_input_size=zeta_input_size)
+batch_size = args.batch_size
+code_threshold = args.code_threshold
 
 leads_idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
+experiment = "physionet"# git_branch.replace('/','_')
+if args.git:
+    import git
+    git_branch = git.Repo(os.getcwd()).active_branch.name
+    experiment = git_branch.replace('/','_')
 ################################################################################
 #
 # Required functions. Edit these functions to add your code, but do not change the arguments for the functions.
@@ -74,8 +82,6 @@ def train_model(data_folder, model_folder, verbose):
     execution_time=datetime.now()
     date = execution_time.date()
     time = execution_time.time()
-    #git_branch = git.Repo(os.getcwd()).active_branch.name
-    experiment = "physionet"# git_branch.replace('/','_')
     log_filename =f'logs/{experiment}/{date}/{execution_time.strftime("%H-%M-%S")}.log'
     tensorboardWriter: SummaryWriter = SummaryWriter(f"runs/{experiment}-{execution_time.strftime('%H-%M-%S')}")
     os.makedirs(os.path.dirname(log_filename), exist_ok=True)
@@ -125,7 +131,7 @@ def train_model(data_folder, model_folder, verbose):
                 sami_trop_recordings.append(record)     
                 continue
             elif "CODE" in source_info[0]:
-                if random.random() > 0.05:
+                if random.random() > code_threshold:
                     continue
             else:
                 if random.random() > 0.08:
@@ -158,7 +164,7 @@ def train_model(data_folder, model_folder, verbose):
     logger.info("Loaded validation dataset")
 
     model = get_MultibranchBeats(alpha_config, beta_config, gamma_config, delta_config, epsilon_config, utilityFunctions.all_classes,device, leads=list(leads))
-    training_config = TrainingConfig(batch_size=190,
+    training_config = TrainingConfig(batch_size=batch_size,
 
                                     n_epochs_stop=early_stop,
                                     num_epochs=epochs,
@@ -170,8 +176,22 @@ def train_model(data_folder, model_folder, verbose):
                                     model_repository=model_folder
                                     )
 
-    training_data_loader = torch_data.DataLoader(training_dataset, batch_size=190, shuffle=True, num_workers=6)
-    test_data_loader = torch_data.DataLoader(test_dataset, batch_size=190, shuffle=True, num_workers=6)
+    training_dataset.open_hdf5()
+    test_dataset.open_hdf5()
+
+    labels_training = [training_dataset[i][2][0] for i in range(len(training_dataset))] 
+    labels_test = [test_dataset[i][2][0] for i in range(len(test_dataset))] 
+    sampler_training = GuaranteePositiveBatchSampler(labels_training, batch_size, drop_last=True)
+    sampler_test = GuaranteePositiveBatchSampler(labels_test, batch_size, drop_last=True)
+
+    del training_dataset, test_dataset
+
+    training_dataset = HDF5Dataset('./' + utilityFunctions.training_filename, recursive=False, load_data=False, data_cache_size=4, transform=None, leads=leads_idx)
+    test_dataset = HDF5Dataset('./' + utilityFunctions.test_filename, recursive=False, load_data=False, data_cache_size=4, transform=None, leads=leads_idx)
+
+
+    training_data_loader = torch_data.DataLoader(training_dataset, batch_sampler=sampler_training, num_workers=6)
+    test_data_loader = torch_data.DataLoader(test_dataset, batch_sampler=sampler_test, num_workers=6)
     networkTrainer=NetworkTrainer(utilityFunctions.all_classes, training_config, tensorboardWriter, model_name_prefix=experiment)
 
     trained_model_name= networkTrainer.train(model, alpha_config, beta_config, training_data_loader,  test_data_loader, leads)
@@ -183,9 +203,6 @@ def train_model(data_folder, model_folder, verbose):
 # Load your trained models. This function is *required*. You should edit this function to add your code, but do *not* change the
 # arguments of this function. If you do not train one of the models, then you can return None for the model.
 def load_model(model_folder, verbose):
-    #git_branch = git.Repo(os.getcwd()).active_branch.name
-    experiment = "physionet"# git_branch.replace('/','_')
-
     checkpoint = torch.load(os.path.join(model_folder, f"{experiment}_best_model_physionet2025.th"), map_location=torch.device(device))
     model = get_MultibranchBeats(alpha_config, beta_config, gamma_config,
                                  delta_config, epsilon_config, 
@@ -238,7 +255,7 @@ def run_model(record, model, verbose):
 
 
     recording_raw, recording_drift_removed, rr_features, wavelet_features= utilityFunctions.one_file_training_data(recording, drift_removed_recording, signals, infos, rates, utilityFunctions.window_size, peaks, header, leads)
-    logger.info(f"RAW: {recording_raw.shape}, DRIFT: {recording_drift_removed.shape}, DOMAIN: {rr_features.shape}, Wavelets: {wavelet_features.shape}")
+    logger.debug(f"RAW: {recording_raw.shape}, DRIFT: {recording_drift_removed.shape}, DOMAIN: {rr_features.shape}, Wavelets: {wavelet_features.shape}")
 
     recording_features = torch.Tensor(np.array([recording_features_record] * recording_raw.shape[0])).to(device)
 
