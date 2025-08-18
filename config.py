@@ -22,16 +22,16 @@ class ARGS():
         self.fold_to_process = ""
         self.network = "NBEATS"
         self.include_domain = False
-        self.alpha_hidden=12
+        self.alpha_hidden=62
         self.alpha_layers=2
-        self.beta_hidden=12
+        self.beta_hidden=62
         self.beta_layers=2
         self.epochs=50
         self.early_stop=10
         self.fold = 1
         self.leads = "12"
-        self.name = f"{self.network}_{self.leads}_{datetime.today().strftime('%Y-%m-%d')}"
-        self.git = True
+        self.name = f"{self.network}_fixed_windows_{self.leads}_{datetime.today().strftime('%Y-%m-%d')}"
+        self.git = False
         self.code_threshold = 0.05 #for submission it should be 0.05
 
 

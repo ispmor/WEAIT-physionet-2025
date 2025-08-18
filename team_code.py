@@ -181,8 +181,6 @@ def train_model(data_folder, model_folder, verbose):
 
     labels_training = [training_dataset[i][2][0] for i in range(len(training_dataset))] 
     labels_test = [test_dataset[i][2][0] for i in range(len(test_dataset))] 
-    print(labels_training)
-    print(labels_test)
     sampler_training = GuaranteePositiveBatchSampler(labels_training, batch_size, drop_last=True)
     sampler_test = GuaranteePositiveBatchSampler(labels_test, batch_size, drop_last=True)
 
@@ -257,7 +255,7 @@ def run_model(record, model, verbose):
 
 
     recording_raw, recording_drift_removed, rr_features, wavelet_features= utilityFunctions.one_file_training_data(recording, drift_removed_recording, signals, infos, rates, utilityFunctions.window_size, peaks, header, leads)
-    logger.info(f"RAW: {recording_raw.shape}, DRIFT: {recording_drift_removed.shape}, DOMAIN: {rr_features.shape}, Wavelets: {wavelet_features.shape}")
+    logger.debug(f"RAW: {recording_raw.shape}, DRIFT: {recording_drift_removed.shape}, DOMAIN: {rr_features.shape}, Wavelets: {wavelet_features.shape}")
 
     recording_features = torch.Tensor(np.array([recording_features_record] * recording_raw.shape[0])).to(device)
 
