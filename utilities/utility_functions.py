@@ -363,6 +363,8 @@ class UtilityFunctions:
             
             new_windows = recording_raw.shape[0]
             recording_features_repeated = np.repeat([recording_features_record], new_windows, axis=0)
+            logger.info(f"recording_features_record original shape: {recording_features_record.shape}")
+            logger.info(f"Recording features repeated shape: {recording_features_repeated.shape}")
             
             if new_windows == 0:
                 logger.debug("New windows is 0! SKIPPING")
