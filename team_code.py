@@ -24,7 +24,7 @@ from torch.utils import data as torch_data
 from training import *
 from torch.nn import BCEWithLogitsLoss
 import torch
-import git
+#import git
 
 
 logger = logging.getLogger(__name__)
@@ -74,8 +74,8 @@ def train_model(data_folder, model_folder, verbose):
     execution_time=datetime.now()
     date = execution_time.date()
     time = execution_time.time()
-    git_branch = git.Repo(os.getcwd()).active_branch.name
-    experiment = git_branch.replace('/','_')
+    #git_branch = git.Repo(os.getcwd()).active_branch.name
+    experiment = "physionet"# git_branch.replace('/','_')
     log_filename =f'logs/{experiment}/{date}/{execution_time.strftime("%H-%M-%S")}.log'
     tensorboardWriter: SummaryWriter = SummaryWriter(f"runs/{experiment}-{execution_time.strftime('%H-%M-%S')}")
     os.makedirs(os.path.dirname(log_filename), exist_ok=True)
@@ -183,8 +183,8 @@ def train_model(data_folder, model_folder, verbose):
 # Load your trained models. This function is *required*. You should edit this function to add your code, but do *not* change the
 # arguments of this function. If you do not train one of the models, then you can return None for the model.
 def load_model(model_folder, verbose):
-    git_branch = git.Repo(os.getcwd()).active_branch.name
-    experiment = git_branch.replace('/','_')
+    #git_branch = git.Repo(os.getcwd()).active_branch.name
+    experiment = "physionet"# git_branch.replace('/','_')
 
     checkpoint = torch.load(os.path.join(model_folder, f"{experiment}_best_model_physionet2025.th"), map_location=torch.device(device))
     model = get_MultibranchBeats(alpha_config, beta_config, gamma_config,
