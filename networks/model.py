@@ -227,8 +227,7 @@ class Nbeats_beta(nn.Module):
                                      input_features_size=input_features_size_b,
                                      dropout_rate=dropout_rate)
 
-        self.fc = nn.Linear(self.input_size,
-                            num_classes)  # hidden_size, 128)  # fully connected 1# fully connected last layer
+        self.fc = nn.Linear(input_features_size_b * self.input_size, num_classes)  # hidden_size, 128)  # fully connected 1# fully connected last layer
         self.dropoutNBEATS = nn.Dropout(dropout_rate)
 
         logger.debug(f"{self}")
@@ -242,7 +241,8 @@ class Nbeats_beta(nn.Module):
         logger.debug(f"Nbeats_beta OUTPUT shape: {output_beta.shape}")
         output_beta = self.dropoutNBEATS(output_beta)
         logger.debug(f"Nbeats_beta DROPOUT OUTPUT shape: {output_beta.shape}")
-        out = self.relu(output_beta)  # relu
+        out = torch.flatten(output_beta, start_dim=1)
+        out = self.relu(out)  # relu
         out = self.fc(out)  # Final Output
 
         return out
