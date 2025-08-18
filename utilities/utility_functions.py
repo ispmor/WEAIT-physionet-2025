@@ -121,6 +121,7 @@ class UtilityFunctions:
         peaks_considered = []
         recording_length=len(drift_removed_recording[0])
         # THIS SHOULD BE FIXED TO ITERATE OVER PEAKS!
+        saved_peaks = []
         for peak in peaks:
             if peak - 400 <  0:
                 continue
@@ -128,7 +129,9 @@ class UtilityFunctions:
                 signal_local = drift_removed_recording[:, peak-400: peak + self.window_size-400]
                 signal_local_raw = recording[:, peak-400: peak + self.window_size-400]
                 wavelet_features = self.get_wavelet_features(signal_local, 'db2')
-                peaks_considered.extend([p for p in peaks if peak <= p < peak+self.window_size])
+                peaks_considered.extend([p for p in peaks if peak <= p < peak+self.window_size - 400])
+                saved_peaks.append(peak)
+
             else:
                 logger.debug(f"Skipping append as peak = {peak}")
                 continue
@@ -145,10 +148,9 @@ class UtilityFunctions:
 
         rr_features = np.zeros((x_drift_removed.shape[0], drift_removed_recording.shape[0], self.rr_features_size), dtype=np.float64)
         counter = 0 
-        for peak in range(0, recording_length-self.window_size, self.window_size):
-
+        for peak in saved_peaks:
             try:
-                domain_knowledge_analysis = analyse_recording(drift_removed_recording, signals, infos, rates,leads_idxs_dict[len(leads)], window=(peak, peak+self.window_size), pantompkins_peaks=peaks_considered)
+                domain_knowledge_analysis = analyse_recording(drift_removed_recording, signals, infos, rates,leads_idxs_dict[len(leads)], window=(peak-400, peak+self.window_size-400), pantompkins_peaks=peaks_considered)
                 logger.debug(f"{domain_knowledge_analysis}")
                 rr_features[counter] = analysis_dict_to_array(domain_knowledge_analysis, leads_idxs_dict[len(leads)])
                 counter += 1
