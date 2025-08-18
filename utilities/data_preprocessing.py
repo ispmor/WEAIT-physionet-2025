@@ -23,13 +23,6 @@ def multibranch_division(batch):
     pca_features = torch.hstack((pca_features[0].reshape(pca_features[0].shape[0], -1), pca_features[1], pca_features[2].reshape(pca_features[2].shape[0], -1)))
     pca_features = pca_features[:, :, None]
 
-    x_raw = torch.transpose(x_raw, 1, 2)
-    x_drift_removed = torch.transpose(x_drift_removed, 1, 2)
-    rr_features = torch.transpose(rr_features, 1, 2)
-    wavelet_features = torch.transpose(wavelet_features, 1, 2)
-    pca_features = torch.transpose(pca_features, 1, 2)
-
-
     alpha_input = x_raw
     beta_input = wavelet_features
     gamma_input = rr_features
