@@ -234,7 +234,10 @@ class UtilityFunctions:
 
         # Extract the age from the record.
         age = get_age(header)
-        age = np.array([age])
+        if age is None:
+            age = np.array([-1])
+        else:
+            age = np.array([age])
 
         # Extract the sex from the record and represent it as a one-hot encoded vector.
         sex = get_sex(header)
