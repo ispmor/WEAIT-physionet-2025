@@ -32,6 +32,6 @@ class ARGS():
         self.leads = "12"
         self.name = f"{self.network}_fixed_windows_{self.leads}_{datetime.today().strftime('%Y-%m-%d')}"
         self.git = False
-        self.code_threshold = 0.05 #for submission it should be 0.05
+        self.code_threshold = 0.02 #for submission it should be 0.05
 
 
