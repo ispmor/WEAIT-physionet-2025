@@ -134,8 +134,11 @@ def train_model(data_folder, model_folder, verbose):
                 if random.random() > code_threshold:
                     continue
             else:
-                if random.random() > 0.05:
+                if random.random() > 0.1:
                     continue
+        else:
+            if random.random() > 0.1:
+                continue
 
         
         header_files.append(os.path.join(data_folder, get_header_file(records[i])))
