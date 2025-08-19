@@ -237,36 +237,34 @@ def run_model(record, model, verbose):
 
     try:
         age, sex_one_hot_encoding, source, signal_mean, signal_std, signal, fields = utilityFunctions.extract_features(record)
-    except Exception as e:
-        print(f"Skipping {header_file} and associated recording  because of {e}")
-        return 0.0, 0.0
 
-    recording_full=utilityFunctions.load_and_equalize_recording(signal, fields, header_file, 400)
-    drift_removed_recording, recording, signals, infos, peaks, rates = utilityFunctions.preprocess_recording(recording_full, header,  leads_idxs=utility_functions.leads_idxs_dict[len(leads)])
+        recording_full=utilityFunctions.load_and_equalize_recording(signal, fields, header_file, 400)
+        drift_removed_recording, recording, signals, infos, peaks, rates = utilityFunctions.preprocess_recording(recording_full, header,  leads_idxs=utility_functions.leads_idxs_dict[len(leads)])
             
-    recording_features_record = np.concatenate((age, sex_one_hot_encoding, signal_mean, signal_std))
+        recording_features_record = np.concatenate((age, sex_one_hot_encoding, signal_mean, signal_std))
 
-    if signals is None or infos is None or peaks is None or rates is None:
-        print("Failed to extract needed data - returning zeros")
-        probability_output = 0.0
-        binary_output = 0.0
-        return binary_output, probability_output
+        if signals is None or infos is None or peaks is None or rates is None:
+            print("Failed to extract needed data - returning zeros")
+            probability_output = 0.0
+            binary_output = 0.0
+            return binary_output, probability_output
 
 
-    recording_raw, recording_drift_removed, rr_features, wavelet_features= utilityFunctions.one_file_training_data(recording, drift_removed_recording, signals, infos, rates, utilityFunctions.window_size, peaks, header, leads)
-    logger.debug(f"RAW: {recording_raw.shape}, DRIFT: {recording_drift_removed.shape}, DOMAIN: {rr_features.shape}, Wavelets: {wavelet_features.shape}")
+        recording_raw, recording_drift_removed, rr_features, wavelet_features= utilityFunctions.one_file_training_data(recording, drift_removed_recording, signals, infos, rates, utilityFunctions.window_size, peaks, header, leads)
+        logger.debug(f"RAW: {recording_raw.shape}, DRIFT: {recording_drift_removed.shape}, DOMAIN: {rr_features.shape}, Wavelets: {wavelet_features.shape}")
+        if recording_raw.shape[0] == 0:
+            return 0.0, 0.0
 
-    recording_features = torch.Tensor(np.array([recording_features_record] * recording_raw.shape[0])).to(device)
+        recording_features = torch.Tensor(np.array([recording_features_record] * recording_raw.shape[0])).to(device)
 
-    recording_raw = torch.Tensor(recording_raw).to(device)
-    recording_drift_removed = torch.Tensor(recording_drift_removed).to(device)
-    rr_features = torch.Tensor(rr_features).to(device)
-    wavelet_features = torch.Tensor(wavelet_features).to(device)
+        recording_raw = torch.Tensor(recording_raw).to(device)
+        recording_drift_removed = torch.Tensor(recording_drift_removed).to(device)
+        rr_features = torch.Tensor(rr_features).to(device)
+        wavelet_features = torch.Tensor(wavelet_features).to(device)
 
-    batch = (recording_raw, recording_drift_removed,  None, rr_features, wavelet_features, recording_features)
-    alpha_input, beta_input, gamma_input, delta_input, epsilon_input, recording_features, _= batch_preprocessing(batch)
-    # Get the model outputs.
-    try:
+        batch = (recording_raw, recording_drift_removed,  None, rr_features, wavelet_features, recording_features)
+        alpha_input, beta_input, gamma_input, delta_input, epsilon_input, recording_features, _= batch_preprocessing(batch)
+        # Get the model outputs.
         model_outputs = model(alpha_input, beta_input, gamma_input, delta_input, epsilon_input, recording_features)
         probability_output = torch.mean(torch.nn.functional.sigmoid(model_outputs), 0).detach().cpu().numpy()[0]
         binary_output = float(probability_output > 0.5)
