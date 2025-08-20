@@ -131,13 +131,13 @@ def train_model(data_folder, model_folder, verbose):
                 sami_trop_recordings.append(record)     
                 continue
             elif "CODE" in source_info[0]:
-                if random.random() > code_threshold:
+                if random.random() > 0.01:
                     continue
             else:
-                if random.random() > 0.1:
+                if random.random() > 0.01:
                     continue
         else:
-            if random.random() > 0.1:
+            if random.random() > 0.01:
                 continue
 
         
